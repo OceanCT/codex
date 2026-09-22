@@ -39,6 +39,13 @@ impl ThreadRequestProcessor {
         std::fs::create_dir_all(&directory).map_err(trash_error)?;
         // Establish a writable destination before stopping or archiving anything.
         let mut file = tempfile::NamedTempFile::new_in(&directory).map_err(trash_error)?;
+        // Unlike ordinary archive, the bin accepts freshly created empty tasks.
+        // Persist all loaded members before archive reads or discards live state.
+        for member_id in self.state_db_spawn_subtree_thread_ids(root).await? {
+            if let Ok(thread) = self.thread_manager.get_thread(member_id).await {
+                thread.persist_rollout().await.map_err(trash_error)?;
+            }
+        }
         let (response, restore_ids) = self.thread_archive_response(params).await?;
         let mut members = Vec::new();
         for id in self.state_db_spawn_subtree_thread_ids(root).await? {

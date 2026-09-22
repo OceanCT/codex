@@ -45,6 +45,12 @@ fails, the old instance stays loaded so the request can be retried.
 - If any member was restored, modified or is loaded, cleanup cancels expiry for
   that entry. Existing permanent-delete RPC behavior is unchanged.
 
+The bin also accepts newly created tasks with no messages: it persists loaded
+members before archiving them. Idle unload likewise persists empty conversations
+before releasing their runtime. Storage failures keep the runtime available for
+retry. This prevents future missing-rollout errors; it cannot reconstruct an
+empty conversation that an older server already discarded.
+
 ## Math and Images
 
 The Y launcher enables native iTerm2 images with `CODEXY_RICH_MEDIA=1`.
@@ -82,6 +88,11 @@ so it does not qualify for the public stable-release updater. Automated upstream
 checks are not configured yet.
 
 ## Validation
+
+Empty-task lifecycle validation includes bin/restore across restart, idle unload
+followed by resume (both history modes), and storage failure followed by retry.
+The 22 selected app-server tests also cover ordinary archive/unarchive, existing
+bin behavior, unsubscribe during a turn, and the earlier resume fix.
 
 Native media validation: 34 focused TUI tests and four real LaTeX renderer tests
 passed. An iTerm2 tab was used to inspect inline math, matrices, fractions,

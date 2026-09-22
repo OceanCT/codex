@@ -318,6 +318,14 @@ impl CodexThread {
             .await;
     }
 
+    /// Materializes durable history before a lifecycle operation discards live state.
+    /// Returns storage failures so the caller can keep the thread loaded and retry.
+    pub async fn persist_rollout(&self) -> std::io::Result<()> {
+        self.session
+            .try_ensure_rollout_materialized(PersistContext::Standard)
+            .await
+    }
+
     #[doc(hidden)]
     pub async fn flush_rollout(&self) -> std::io::Result<()> {
         self.session.flush_rollout().await

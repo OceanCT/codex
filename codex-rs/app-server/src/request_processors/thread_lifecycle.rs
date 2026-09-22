@@ -381,6 +381,15 @@ pub(super) async fn ensure_listener_task_running(
                         }
                         pending_thread_unloads.insert(conversation_id);
                     }
+                    // Empty conversations also need durable history after losing
+                    // their final subscriber. Keep the runtime and listener on failure.
+                    if let Err(error) = conversation.persist_rollout().await {
+                        pending_thread_unloads.lock().await.remove(&conversation_id);
+                        warn!(%error, "failed to persist thread {conversation_id}; deferring idle unload");
+                        unloading_state.delay = unloading_state.delay.max(Duration::from_secs(1));
+                        unloading_state.note_thread_activity_observed();
+                        continue;
+                    }
                     unload_thread_without_subscribers(
                         thread_manager.clone(),
                         outgoing_for_task.clone(),
