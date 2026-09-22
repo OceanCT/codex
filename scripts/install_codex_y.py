@@ -55,7 +55,7 @@ def main():
         # Separate copies prevent token refresh or logout from modifying the original file.
         shutil.copyfile(original / "auth.json", auth)
         auth.chmod(0o600)
-    launcher = user_home / ".local/bin/codex-y"
+    launcher = user_home / ".local/bin/codexy"
     launcher.parent.mkdir(parents=True, exist_ok=True)
     if launcher.exists() and "Codex Y isolated launcher" not in launcher.read_text():
         raise SystemExit(f"Refusing to replace an unrelated command: {launcher}")
@@ -73,7 +73,7 @@ def main():
         "    env.pop(key, None)\n"
         "if not binary.is_file():\n"
         "    sys.exit('Codex Y is unavailable. Use the original codex command.')\n"
-        "os.execve(binary, ['codex-y', *sys.argv[1:]], env)\n"
+        "os.execve(binary, ['codexy', *sys.argv[1:]], env)\n"
     )
     launcher.chmod(0o755)
     print(f"Installed: {launcher}\nData: {isolated}\nOriginal command: codex")

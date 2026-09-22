@@ -5,11 +5,11 @@ This fork keeps the original `codex` installation available. Build with
 in `codex-rs`, then run
 `python3 scripts/install_codex_y.py` from the repository root.
 
-Run `codex-y agents` for the command center, or `codex-y` for a conversation.
+Run `codexy agents` for the command center, or `codexy` for a conversation.
 The installer gives Y its own configuration, session database and daemon under
 `~/.codex-y`. It copies model preferences and file-based authentication once.
 Existing original sessions stay in `~/.codex`; importing them is a separate task.
-If authentication needs refreshing, run `codex-y login`.
+If authentication needs refreshing, run `codexy login`.
 The original `codex` command and installation remain untouched.
 
 ## Recycle Bin
