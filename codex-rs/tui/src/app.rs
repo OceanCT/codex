@@ -208,6 +208,7 @@ mod agents_overview_details;
 mod agents_overview_threads;
 mod agents_overview_usage;
 mod agents_overview_view;
+mod agents_recycle_bin;
 pub(crate) use agents_overview::AGENTS_OVERVIEW_VIEW_ID;
 mod activity_groups;
 mod app_server_event_targets;

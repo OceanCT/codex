@@ -23,6 +23,6 @@ expression: "screen(&view, width, height)"
   x          Stop
   a          Archive
   h          Hide
-  backspace  Delete
+  backspace  Move to bin
   … resize to see all
   esc back

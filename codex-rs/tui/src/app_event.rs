@@ -331,6 +331,10 @@ pub(crate) enum AppEvent {
         thread_id: ThreadId,
     },
     /// Confirm a server lifecycle action for the selected dashboard task.
+    OpenAgentsBin,
+    RestoreAgentsBin {
+        thread_id: ThreadId,
+    },
     ConfirmAgentsOverviewAction {
         thread_id: ThreadId,
         action: AgentsOverviewAction,

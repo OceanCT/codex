@@ -1,3 +1,41 @@
+# Local Resource Budget
+
+These rules apply to all local work in this fork and take precedence over the
+broader validation instructions below. Keep the user's computer responsive.
+
+- Run only one resource-intensive workflow at a time across all terminals,
+  tools and agents. Builds, tests, Clippy, schema generation and dependency
+  installation must run sequentially. Do not queue extra Cargo commands behind
+  a build lock or leave validation running in the background after reporting completion.
+- Cargo defaults to at most two concurrent build jobs through `.cargo/config.toml`.
+  The Nextest `local` profile runs one test at a time. Do not raise these values
+  through flags, environment variables or another profile without the user's
+  explicit authorization. Run Cargo from this repository or a subdirectory so
+  it loads the repository configuration.
+- These are concurrency limits, not hard CPU or RAM quotas. Compilers, linkers
+  and test subprocesses can still consume substantial resources. Reduce build
+  jobs to one or stop the workflow if the machine becomes unresponsive or the
+  user reports excessive load.
+- Validate the smallest affected behavior first. Use package and test-name
+  filters together, for example `just test -p codex-tui agents_overview`.
+  Whole-package suites, workspace suites, benchmarks and release builds require
+  an explicit user request; otherwise leave broad validation to CI.
+- For documentation or build-limit configuration edits, use syntax checks and
+  diff review. Do not compile Rust, install dependencies or invoke the full
+  repository formatter just to validate those edits.
+- Reuse existing build artifacts. Do not run `cargo clean`, switch build profiles,
+  add feature combinations or create another target directory without a concrete
+  need. Do not repeat passing checks unless a new change or failure justifies it.
+- During long operations, provide a brief update at least every 60 seconds.
+  Inspect only relevant process/resource information when needed. If resource
+  contention causes timeouts, reduce load before retrying; do not launch more jobs.
+- A user request to stop, or a complaint about resource usage, takes priority
+  over waiting for a build. Gracefully interrupt only this task's verified
+  process groups and check for leftover compiler and test processes. Preserve
+  source files and caches; never stop the user's original Codex sessions.
+- Report which checks passed, failed or were stopped. Do not present an
+  interrupted suite as a completed validation.
+
 # Rust/codex-rs
 
 In the codex-rs folder where the rust code lives:
@@ -59,13 +97,22 @@ In the codex-rs folder where the rust code lives:
     the new implementation so the invariants stay close to the code that owns them.
   - Avoid adding new standalone methods to `codex-rs/tui/src/chatwidget.rs` unless the change is
     trivial; prefer new modules/files and keep `chatwidget.rs` focused on orchestration.
-- When running Rust commands (e.g. `just fix` or `just test`) be patient with the command and never try to kill them using the PID. Rust lock can make the execution slow, this is expected.
+- Wait patiently for normal Rust progress. Do not start another workflow when a
+  build lock is held; investigate the existing task. Follow the Local Resource
+  Budget when interruption is needed.
 
-Run `just fmt` (in the `codex-rs` directory) automatically after you have finished making code changes anywhere in this repository; do not ask for approval to run it. Additionally, run the tests:
+For code changes, run `just fmt` (in the `codex-rs` directory) as a separate,
+sequential step. Documentation and build-limit configuration edits use the
+lightweight checks described above. Additionally, run the tests:
 
 1. Do not run `cargo test` directly. Use `just test` so test execution follows the repo defaults.
-2. Run the test for the specific project that was changed. For example, if changes were made in `codex-rs/tui`, run `just test -p codex-tui`.
-3. Once those pass, if any changes were made in common, core, or protocol, run the complete test suite with `just test`. Avoid `--all-features` for routine local runs because it expands the build matrix and can significantly increase `target/` disk usage; use it only when you specifically need full feature coverage. project-specific or individual tests can be run without asking the user, but do ask the user before running the complete test suite.
+2. Select the changed package and relevant tests, for example
+   `just test -p codex-tui agents_overview`. Use the `local` profile's single-test
+   concurrency limit.
+3. Shared-code changes may need broader coverage, but do not automatically run
+   whole-package or workspace suites. Follow the Local Resource Budget and use
+   CI or the user's explicitly requested scope. Avoid `--all-features` in routine
+   local work.
 
 Before finalizing a large change to `codex-rs`, run `just fix -p <project>` (in `codex-rs` directory) to fix any linter issues in the code. Prefer scoping with `-p` to avoid slow workspace‑wide Clippy builds; only run `just fix` without `-p` if you changed shared crates. Do not re-run tests after running `fix` or `fmt`.
 

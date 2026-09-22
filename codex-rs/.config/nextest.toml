@@ -20,6 +20,8 @@ path = "junit.xml"
 
 [profile.local]
 inherits = "default"
+# Local validation shares the machine with interactive work.
+test-threads = 1
 
 [test-groups.app_server_protocol_codegen]
 max-threads = 1
@@ -30,7 +32,7 @@ max-threads = 1
 # Higher concurrency causes integration test timeouts under resource contention
 # on common developer machines.
 [test-groups.app_server_integration_local]
-max-threads = 4
+max-threads = 1
 
 [test-groups.core_apply_patch_cli_integration]
 max-threads = 1

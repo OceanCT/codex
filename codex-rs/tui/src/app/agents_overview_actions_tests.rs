@@ -12,9 +12,9 @@ use core_test_support::streaming_sse::start_streaming_sse_server;
 use pretty_assertions::assert_eq;
 
 #[tokio::test]
-async fn archive_confirmation_number_keys_act_immediately() {
-    for key in ['1', '2'] {
-        let (mut app, mut rx, _op_rx) = crate::app::tests::make_test_app_with_channels().await;
+async fn lifecycle_actions_dispatch_immediately() {
+    for action in [AgentsOverviewAction::Archive, AgentsOverviewAction::Delete] {
+        let (mut app, mut rx, _) = crate::app::tests::make_test_app_with_channels().await;
         let id = ThreadId::new();
         app.agents_overview.threads.insert(
             id,
@@ -25,31 +25,17 @@ async fn archive_confirmation_number_keys_act_immediately() {
                 ThreadStatus::Idle,
             )),
         );
-        app.confirm_agents_overview_action(id, AgentsOverviewAction::Archive);
-        insta::assert_snapshot!(
-            "archive_task_confirmation",
-            render_bottom_popup(&app.chat_widget, /*width*/ 72)
-        );
-
-        app.chat_widget.handle_key_event(KeyCode::Char(key).into());
-
-        assert!(!app.chat_widget.has_active_view());
-        let actions = std::iter::from_fn(|| rx.try_recv().ok())
-            .filter_map(|event| match event {
-                AppEvent::RunAgentsOverviewAction { thread_id, action } => {
+        app.confirm_agents_overview_action(id, action);
+        let actions: Vec<_> = std::iter::from_fn(|| rx.try_recv().ok())
+            .filter_map(|event| {
+                if let AppEvent::RunAgentsOverviewAction { thread_id, action } = event {
                     Some((thread_id, action))
+                } else {
+                    None
                 }
-                _ => None,
             })
-            .collect::<Vec<_>>();
-        assert_eq!(
-            actions,
-            if key == '2' {
-                vec![(id, AgentsOverviewAction::Archive)]
-            } else {
-                Vec::new()
-            }
-        );
+            .collect();
+        assert_eq!(actions, vec![(id, action)]);
     }
 }
 
@@ -390,7 +376,9 @@ async fn rejected_delete_preserves_a_live_attachment_and_draft() -> Result<()> {
         (Some(id), Some(id))
     );
     assert_eq!(app.chat_widget.capture_thread_input_state(), draft);
-    assert!(render_bottom_popup(&app.chat_widget, /*width*/ 80).contains("Could not delete task"));
+    assert!(
+        render_bottom_popup(&app.chat_widget, /*width*/ 80).contains("Could not move to bin task")
+    );
     app_server.shutdown().await?;
     Ok(())
 }
@@ -675,22 +663,6 @@ async fn lifecycle_removes_background_and_current_tasks_without_losing_the_dashb
             .find(|event| matches!(event, AppEvent::ConfirmAgentsOverviewAction { .. }))
             .expect("shortcut requests confirmation");
         Box::pin(app.handle_event(&mut tui, &mut app_server, confirmation)).await?;
-        insta::assert_snapshot!(
-            format!("{snapshot}_confirmation"),
-            render_bottom_popup(&app.chat_widget, /*width*/ 72)
-        );
-        app.chat_widget.handle_key_event(KeyCode::Enter.into());
-        assert!(
-            !std::iter::from_fn(|| rx.try_recv().ok())
-                .any(|event| matches!(event, AppEvent::RunAgentsOverviewAction { .. }))
-        );
-        app.chat_widget.handle_key_event(key);
-        let confirmation = std::iter::from_fn(|| rx.try_recv().ok())
-            .find(|event| matches!(event, AppEvent::ConfirmAgentsOverviewAction { .. }))
-            .expect("shortcut requests confirmation again");
-        Box::pin(app.handle_event(&mut tui, &mut app_server, confirmation)).await?;
-        app.chat_widget.handle_key_event(KeyCode::Down.into());
-        app.chat_widget.handle_key_event(KeyCode::Enter.into());
         let confirmed = std::iter::from_fn(|| rx.try_recv().ok())
             .find(|event| matches!(event, AppEvent::RunAgentsOverviewAction { .. }))
             .expect("confirmation requests lifecycle action");
@@ -723,22 +695,23 @@ async fn lifecycle_removes_background_and_current_tasks_without_losing_the_dashb
                 .selected_index_for_present_view(AGENTS_OVERVIEW_VIEW_ID)
                 .is_some()
         );
-        match action {
-            AgentsOverviewAction::Archive => {
-                app_server.thread_unarchive(id).await?;
-            }
-            AgentsOverviewAction::Delete => {
-                assert!(
-                    app_server
-                        .thread_read(id, /*include_turns*/ false)
-                        .await
-                        .is_err()
-                );
-            }
-        }
+        app_server.thread_unarchive(id).await?;
         app_server.shutdown().await?;
         drop(release);
         server.shutdown().await;
     }
+    Ok(())
+}
+
+#[tokio::test]
+async fn empty_bin_has_restore_instructions() -> Result<()> {
+    let mut app = make_test_app().await;
+    let mut server = crate::start_embedded_app_server_for_picker(&app.config).await?;
+    app.open_agents_bin(&mut server).await;
+    insta::assert_snapshot!(
+        "empty_recycle_bin",
+        render_bottom_popup(&app.chat_widget, /*width*/ 72)
+    );
+    server.shutdown().await?;
     Ok(())
 }

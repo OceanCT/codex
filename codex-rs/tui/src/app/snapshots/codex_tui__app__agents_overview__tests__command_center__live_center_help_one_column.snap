@@ -23,13 +23,13 @@ expression: "screen(&view, width, height)"
   x          Stop
   a          Archive
   h          Hide
-  backspace  Delete
+  backspace  Move to bin
+  ctrl+b     Open bin / restore
 
   View
   tab/shift+tab  Filter
   f              Search
   g              Group
-
 
 
 

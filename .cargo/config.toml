@@ -1,0 +1,4 @@
+# Keep local builds responsive. Loaded from the repo root and its subdirectories.
+# This limits concurrent build jobs, not total CPU or memory usage.
+[build]
+jobs = 2

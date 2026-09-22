@@ -86,12 +86,16 @@ impl AgentsOverviewView {
             ("stop", &self.agents_keymap.stop, "Stop"),
             ("archive", &self.agents_keymap.archive, "Archive"),
             ("hide", &self.agents_keymap.hide, "Hide"),
-            ("delete", &self.agents_keymap.delete, "Delete"),
+            ("delete", &self.agents_keymap.delete, "Move to bin"),
         ] {
             if action != "new_worktree" || self.worktrees_enabled {
                 tasks.push(self.agents_keymap.primary_hint(action, bindings), label);
             }
         }
+        tasks.entries.push(Shortcut::new(
+            key_hint::ctrl(KeyCode::Char('b')),
+            "Open bin / restore",
+        ));
         let mut view = Group {
             title: "View",
             entries: Vec::new(),

@@ -145,6 +145,7 @@ mod thread_shell_command;
 mod thread_start;
 mod thread_status;
 mod thread_timeline;
+mod thread_trash;
 mod thread_unarchive;
 mod thread_unsubscribe;
 mod turn_cost_otel;

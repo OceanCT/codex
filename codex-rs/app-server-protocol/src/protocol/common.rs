@@ -571,6 +571,25 @@ client_request_definitions! {
         serialization: thread_id(params.thread_id),
         response: v2::ThreadArchiveResponse,
     },
+    ThreadTrash => "thread/trash" {
+        params: v2::ThreadArchiveParams,
+        serialization: thread_id(params.thread_id),
+        manual_payload_conversion: manual,
+        response: v2::ThreadArchiveResponse,
+    },
+    ThreadTrashList => "thread/trash/list" {
+        params: v2::ThreadListParams,
+        inspect_params: true,
+        serialization: None,
+        manual_payload_conversion: manual,
+        response: v2::ThreadListResponse,
+    },
+    ThreadTrashRestore => "thread/trash/restore" {
+        params: v2::ThreadUnarchiveParams,
+        serialization: thread_id(params.thread_id),
+        manual_payload_conversion: manual,
+        response: v2::ThreadUnarchiveResponse,
+    },
     ThreadDelete => "thread/delete" {
         params: v2::ThreadDeleteParams,
         serialization: thread_id(params.thread_id),
