@@ -4312,6 +4312,13 @@ impl ThreadRequestProcessor {
                     && matches!(loaded_status, ThreadStatus::Idle)
                     && !is_running
                 {
+                    // Empty threads can still have a deferred rollout. Make the
+                    // replacement resumable before shutdown discards live state.
+                    // A persistence error must leave the existing thread loaded.
+                    self.thread_store
+                        .persist_thread(existing_thread_id, PersistContext::Standard)
+                        .await
+                        .map_err(thread_store_resume_read_error)?;
                     // A loaded idle thread is only a cache entry. Shut it down
                     // before removing it so cold resume cannot duplicate a
                     // thread that timed out during shutdown.
