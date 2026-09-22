@@ -1,9 +1,26 @@
 # Codex Y
 
 This fork keeps the original `codex` installation available. Build with
-`CARGO_BUILD_JOBS=1 nice -n 10 cargo build -p codex-cli --bin codex`
+`CARGO_BUILD_JOBS=1 nice -n 10 cargo build --locked -p codex-cli -p codex-code-mode-host --bin codex --bin codex-code-mode-host`
 in `codex-rs`, then run
 `python3 scripts/install_codex_y.py` from the repository root.
+
+Both binaries must come from the same source checkout and build profile. The
+installer requires an executable `codex-code-mode-host` beside `codex` and
+checks both before changing the installation. With `--binary`, place the matching
+host beside the specified binary. The host executes code-mode tool calls;
+opening the command center alone does not verify that those calls work.
+After installation, run `python3 scripts/smoke_codex_y_host.py` to verify the
+installed host's protocol handshake, JavaScript execution and shell callback.
+This local check does not require a model request or account credentials.
+
+If the host build cannot obtain its V8 archive, an explicit
+`--code-mode-host /path/to/codex-code-mode-host` override can use an existing
+host. The installer runs the smoke check before installing and records the
+source in `runtime-components.json`. This checks the exercised IPC/tool path,
+not full compatibility across releases; prefer a host built from the same
+checkout when its dependencies are available. Do not disable V8 sandbox
+features to work around a missing archive.
 
 Run `codexy agents` for the command center, or `codexy` for a conversation.
 The installer gives Y its own configuration, session database and daemon under
@@ -11,6 +28,11 @@ The installer gives Y its own configuration, session database and daemon under
 Existing original sessions stay in `~/.codex`; importing them is a separate task.
 If authentication needs refreshing, run `codexy login`.
 The original `codex` command and installation remain untouched.
+
+When resume overrides require rebuilding an indexed, idle thread, the server
+persists its rollout before shutting down the old instance. This also covers
+empty threads whose rollout files have not been created yet. If persistence
+fails, the old instance stays loaded so the request can be retried.
 
 ## Recycle Bin
 
@@ -25,14 +47,30 @@ The original `codex` command and installation remain untouched.
 
 ## Math and Images
 
-The upstream renderer already enables Unicode math, including a bounded subset
-of TeX fractions, superscripts and structured expressions. Unsupported TeX stays
-as source. This is terminal text layout, not a complete LaTeX engine.
+The Y launcher enables native iTerm2 images with `CODEXY_RICH_MEDIA=1`.
+Math inside `$...$`, `\(...\)`, `$$...$$`, or `\[...\]` is compiled by local
+pdfLaTeX with AMS math, `mathtools`, `bm`, and `xcolor`, then rasterized to PNG.
+Matrices, aligned equations, integrals and TeX math macros use the real TeX
+engine. This is a math-fragment renderer, not an arbitrary document compiler.
+The original Unicode renderer remains the fallback when dependencies are absent
+or a fragment fails to compile. Math inside code fences stays literal.
 
-iTerm2 already supports inline images through OSC 1337 and, in current versions,
-Kitty graphics. Codex's pet renderer uses graphics protocols, but conversation
-images need separate layout, scrolling and redraw integration. This change does
-not yet render conversation images or full LaTeX as graphics.
+Install TeX with `standalone`, AMS packages, `mathtools`, `bm`, `xcolor`, and
+Poppler (`pdftocairo`, `pdfinfo`) on PATH. The installer bundles the Python
+renderer beside `codex`; it does not download TeX packages automatically.
+
+Local Markdown images, local user attachments and saved generated images display
+through iTerm2 OSC 1337. Row-sized image slices preserve terminal scrolling and
+clipping. Remote URLs remain labels; rendering does not fetch arbitrary URLs.
+Native media is disabled outside iTerm2 and inside tmux/Zellij. Set
+`CODEXY_RICH_MEDIA=0 codexy` to use text rendering.
+
+Resource bounds: one compiler child at a time, three CPU seconds and five wall
+seconds per TeX/raster process, 8 MiB output files, 1600-pixel raster bounds,
+8-megapixel input decode limit, 20 displayed rows per image, and a per-process
+128-entry / 24 MiB encoded-image cache. Width or theme changes may compile a new
+cached variant. Compilation runs at low priority without shell escape; failed
+results are cached too. Original Markdown/TeX remains in the session history.
 
 Reference: https://iterm2.com/documentation-images.html
 
@@ -44,6 +82,11 @@ so it does not qualify for the public stable-release updater. Automated upstream
 checks are not configured yet.
 
 ## Validation
+
+Native media validation: 34 focused TUI tests and four real LaTeX renderer tests
+passed. An iTerm2 tab was used to inspect inline math, matrices, fractions,
+integrals, aligned equations and a local PNG. Run the renderer checks with
+`python3 scripts/test_render_codex_y_latex.py`.
 
 Focused local checks passed with one Cargo build job and one test at a time:
 

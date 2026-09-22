@@ -722,6 +722,7 @@ where
     let mut modifier = Modifier::empty();
     let mut last_pos: Option<Position> = None;
     let mut active_hyperlink: Option<String> = None;
+    let mut image_rows = Vec::new();
     for command in commands {
         let (x, y) = match &command {
             DrawCommand::Put { x, y, .. } => (x, y),
@@ -767,7 +768,12 @@ where
                     queue!(writer, Print(format!("\x1b]8;;{destination}\x07")))?;
                 }
                 let symbol = hyperlink.map_or_else(|| cell.symbol(), |(_, visible)| visible);
-                queue!(writer, Print(symbol))?;
+                if let Some(payload) = crate::rich_media::row(symbol) {
+                    image_rows.push((*x, *y, payload));
+                    queue!(writer, Print(" "))?;
+                } else {
+                    queue!(writer, Print(symbol))?;
+                }
             }
             DrawCommand::ClearToEnd { bg: clear_bg, .. } => {
                 queue!(writer, SetAttribute(crossterm::style::Attribute::Reset))?;
@@ -783,6 +789,13 @@ where
     }
     if active_hyperlink.is_some() {
         queue!(writer, Print("\x1b]8;;\x07"))?;
+    }
+    if !image_rows.is_empty() {
+        queue!(writer, crossterm::cursor::SavePosition)?;
+        for (x, y, payload) in image_rows {
+            queue!(writer, MoveTo(x, y), Print(payload.as_ref()))?;
+        }
+        queue!(writer, crossterm::cursor::RestorePosition)?;
     }
 
     queue!(

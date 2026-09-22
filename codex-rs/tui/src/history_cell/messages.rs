@@ -240,6 +240,17 @@ impl HistoryCell for UserHistoryCell {
             ));
         }
 
+        for path in &self.local_image_paths {
+            if let Some(preview) =
+                crate::rich_media::local_image(path, usize::from(wrap_width).saturating_sub(2))
+            {
+                lines.extend(
+                    preview
+                        .lines()
+                        .map(|row| HyperlinkLine::new(Line::from(format!("  {row}")))),
+                );
+            }
+        }
         lines.push(HyperlinkLine::new(Line::from("").style(style)));
         for source in lines.iter_mut().filter_map(|line| line.source.as_mut()) {
             source.right_reserve = 1;

@@ -221,16 +221,24 @@ impl<'a> MathMarkdown<'a> {
                     continue;
                 }
             }
-            let rendered = if super::preferences::current().math && formula.len() < MAX_MATH_BYTES {
-                render::render(formula, display)
+            let image = if super::preferences::current().math && formula.len() < MAX_MATH_BYTES {
+                crate::rich_media::latex(formula, display, width.unwrap_or(80).saturating_sub(6))
             } else {
                 None
             };
+            let rendered = image.clone().or_else(|| {
+                if super::preferences::current().math && formula.len() < MAX_MATH_BYTES {
+                    render::render(formula, display)
+                } else {
+                    None
+                }
+            });
             let rendered = rendered
                 .filter(|text| {
                     // Nested Markdown prefixes have their own width; keep spatial layouts at the top level.
                     // Never wrap a spatial layout into misleading pieces.
-                    !text.contains('\n')
+                    image.is_some()
+                        || !text.contains('\n')
                         || !containers
                             .peek()
                             .is_some_and(|range| range.contains(&start))

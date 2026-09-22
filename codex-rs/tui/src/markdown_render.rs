@@ -562,10 +562,40 @@ where
             Tag::TableHead => self.start_table_head(),
             Tag::TableRow => self.start_table_row(range),
             Tag::TableCell => self.start_table_cell(),
-            Tag::HtmlBlock
-            | Tag::FootnoteDefinition(_)
-            | Tag::Image { .. }
-            | Tag::MetadataBlock(_) => {}
+            Tag::Image { dest_url, .. } => {
+                let path = if dest_url.starts_with("file://") {
+                    url::Url::parse(&dest_url)
+                        .ok()
+                        .and_then(|url| url.to_file_path().ok())
+                } else if !dest_url.contains("://") {
+                    Some(
+                        self.cwd
+                            .as_deref()
+                            .unwrap_or_else(|| Path::new("."))
+                            .join(dest_url.as_ref()),
+                    )
+                } else {
+                    None
+                };
+                if let Some(preview) = path.as_deref().and_then(|path| {
+                    crate::rich_media::local_image(
+                        path,
+                        self.wrap_width.unwrap_or(80).saturating_sub(8),
+                    )
+                }) {
+                    self.flush_current_line();
+                    for line in preview.lines() {
+                        self.push_line(Line::from(line.to_owned()));
+                    }
+                    // The picture replaces its alt label; unsupported URLs keep the normal label.
+                    for (event, _) in self.iter.by_ref() {
+                        if matches!(event, Event::End(TagEnd::Image)) {
+                            break;
+                        }
+                    }
+                }
+            }
+            Tag::HtmlBlock | Tag::FootnoteDefinition(_) | Tag::MetadataBlock(_) => {}
         }
     }
 

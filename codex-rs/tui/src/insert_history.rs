@@ -337,8 +337,32 @@ fn write_history_line<W: Write>(
         line: Line::from(merged_spans),
         hyperlinks: line.hyperlinks.clone(),
     };
-    let decorated = decorate_spans(&merged_line);
-    write_spans(writer, decorated.iter())
+    let mut images = Vec::new();
+    let mut column = 0;
+    let mut safe_line = merged_line;
+    for span in &mut safe_line.line.spans {
+        let mut text = String::new();
+        for ch in span.content.chars() {
+            if let Some(payload) = crate::rich_media::row(&ch.to_string()) {
+                images.push((column, payload));
+                text.push(' ');
+            } else {
+                text.push(ch);
+            }
+            column += crate::width::char_width(ch) as u16;
+        }
+        span.content = text.into();
+    }
+    let decorated = decorate_spans(&safe_line);
+    write_spans(writer, decorated.iter())?;
+    if !images.is_empty() {
+        queue!(writer, SavePosition)?;
+        for (column, payload) in images {
+            queue!(writer, MoveToColumn(column), Print(payload.as_ref()))?;
+        }
+        queue!(writer, RestorePosition)?;
+    }
+    Ok(())
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]

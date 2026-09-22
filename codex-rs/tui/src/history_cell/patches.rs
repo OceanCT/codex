@@ -207,7 +207,7 @@ pub(crate) fn new_image_generation_call(
     status: &str,
     revised_prompt: Option<String>,
     saved_path: Option<AbsolutePathBuf>,
-) -> PlainHistoryCell {
+) -> GeneratedImageHistoryCell {
     let detail = revised_prompt.unwrap_or(call_id);
     let heading = if status == "failed" {
         vec!["✗ ".red().bold(), "Image generation failed".bold()].into()
@@ -215,12 +215,35 @@ pub(crate) fn new_image_generation_call(
         vec!["• ".dim(), "Generated Image:".bold()].into()
     };
     let mut lines: Vec<Line<'static>> = vec![heading, vec!["  └ ".dim(), detail.dim()].into()];
-    if let Some(saved_path) = saved_path {
+    if let Some(saved_path) = saved_path.as_ref() {
         let saved_path = Url::from_file_path(saved_path.as_path())
             .map(|url| url.to_string())
             .unwrap_or_else(|_| saved_path.display().to_string());
         lines.push(vec!["  └ ".dim(), "Saved to: ".dim(), saved_path.into()].into());
     }
 
-    PlainHistoryCell { lines }
+    GeneratedImageHistoryCell { lines, saved_path }
+}
+
+#[derive(Debug)]
+pub(crate) struct GeneratedImageHistoryCell {
+    lines: Vec<Line<'static>>,
+    saved_path: Option<AbsolutePathBuf>,
+}
+
+impl HistoryCell for GeneratedImageHistoryCell {
+    fn display_lines(&self, width: u16) -> Vec<Line<'static>> {
+        let mut lines = self.lines.clone();
+        if let Some(path) = &self.saved_path
+            && let Some(preview) =
+                crate::rich_media::local_image(path.as_path(), usize::from(width).saturating_sub(4))
+        {
+            lines.extend(preview.lines().map(|row| Line::from(format!("  {row}"))));
+        }
+        lines
+    }
+
+    fn raw_lines(&self) -> Vec<Line<'static>> {
+        plain_lines(self.lines.clone())
+    }
 }
