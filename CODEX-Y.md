@@ -48,8 +48,11 @@ fails, the old instance stays loaded so the request can be retried.
 The bin also accepts newly created tasks with no messages: it persists loaded
 members before archiving them. Idle unload likewise persists empty conversations
 before releasing their runtime. Storage failures keep the runtime available for
-retry. This prevents future missing-rollout errors; it cannot reconstruct an
-empty conversation that an older server already discarded.
+retry. Empty entries receive an `Empty task` display preview, and the bin reads
+the archive index so message-based filesystem discovery does not hide them.
+The label does not add a user message. These changes prevent future missing-rollout
+errors; they cannot reconstruct an empty conversation that an older server already
+discarded.
 
 ## Math and Images
 

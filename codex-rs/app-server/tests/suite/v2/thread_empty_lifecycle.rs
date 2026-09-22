@@ -8,6 +8,7 @@ use codex_app_server_protocol::ThreadArchiveParams;
 use codex_app_server_protocol::ThreadArchiveResponse;
 use codex_app_server_protocol::ThreadClosedNotification;
 use codex_app_server_protocol::ThreadHistoryMode;
+use codex_app_server_protocol::ThreadListResponse;
 use codex_app_server_protocol::ThreadLoadedListParams;
 use codex_app_server_protocol::ThreadLoadedListResponse;
 use codex_app_server_protocol::ThreadResumeParams;
@@ -53,6 +54,19 @@ async fn empty_thread_trash_restores_after_restart() -> Result<()> {
             .with_codex_home(home.path())
             .build_initialized()
             .await?;
+        let page: ThreadListResponse = server
+            .request(|request_id| ClientRequest::ThreadTrashList {
+                request_id,
+                params: serde_json::from_value(serde_json::json!({"modelProviders": []})).unwrap(),
+            })
+            .await?;
+        assert_eq!(
+            page.data
+                .iter()
+                .map(|thread| thread.id.as_str())
+                .collect::<Vec<_>>(),
+            vec![id.as_str()]
+        );
         let restored: ThreadUnarchiveResponse = server
             .request(|request_id| ClientRequest::ThreadTrashRestore {
                 request_id,

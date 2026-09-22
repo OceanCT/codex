@@ -46,6 +46,14 @@ impl ThreadRequestProcessor {
                 thread.persist_rollout().await.map_err(trash_error)?;
             }
         }
+        // A display-only placeholder makes empty tasks discoverable without
+        // inventing a user message or changing their conversation history.
+        if let Some(state_db) = &self.state_db {
+            state_db
+                .set_thread_preview_if_empty(root, "Empty task")
+                .await
+                .map_err(trash_error)?;
+        }
         let (response, restore_ids) = self.thread_archive_response(params).await?;
         let mut members = Vec::new();
         for id in self.state_db_spawn_subtree_thread_ids(root).await? {
@@ -92,6 +100,9 @@ impl ThreadRequestProcessor {
     ) -> Result<Option<ClientResponsePayload>, JSONRPCErrorError> {
         self.purge_expired_trash().await;
         params.archived = Some(true);
+        // Filesystem discovery requires a message-bearing preview. Bin entries
+        // are already indexed by archive, including the empty-task display label.
+        params.use_state_db_only = self.state_db.is_some();
         let mut response = self.thread_list_response_inner(params).await?;
         // Preserve the underlying cursor, including for empty filtered pages.
         let directory = self.config.codex_home.join("recycle-bin");
