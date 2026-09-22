@@ -698,6 +698,7 @@ mod thread_goal_processor;
 mod thread_lifecycle;
 mod thread_resume_redaction;
 mod thread_summary;
+mod thread_trash;
 
 use self::config_errors::*;
 use self::request_errors::*;

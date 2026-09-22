@@ -7,16 +7,16 @@ expression: "screen(&view, width, height)"
   ────────────────────────────────────────────────────────────────────────────────────────────────
   Task shortcuts
 
-  Navigate             Tasks                      View
-  ↑       Up           n          New             tab/shift+tab  Filter
-  ↓       Down         w          New worktree    f              Search
-  enter   Open         o          Resume          g              Group
+  Navigate             Tasks                            View
+  ↑       Up           n          New                   tab/shift+tab  Filter
+  ↓       Down         w          New worktree          f              Search
+  enter   Open         o          Resume                g              Group
   pgup    Page up      r          Rename
   pgdn    Page down    x          Stop
   ctrl+c  Quit         a          Archive
                        h          Hide
-                       backspace  Delete
-
+                       backspace  Move to bin
+                       ctrl+b     Open bin / restore
 
 
 

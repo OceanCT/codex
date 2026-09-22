@@ -825,6 +825,7 @@ impl ThreadRequestProcessor {
         &self,
         params: ThreadListParams,
     ) -> Result<Option<ClientResponsePayload>, JSONRPCErrorError> {
+        self.purge_expired_trash().await;
         self.thread_list_response_inner(params)
             .await
             .map(|response| Some(response.into()))
@@ -1692,7 +1693,7 @@ impl ThreadRequestProcessor {
         self.thread_archive_response(params).await
     }
 
-    async fn thread_archive_response(
+    pub(super) async fn thread_archive_response(
         &self,
         params: ThreadArchiveParams,
     ) -> Result<(ThreadArchiveResponse, Vec<String>), JSONRPCErrorError> {
@@ -2077,7 +2078,7 @@ impl ThreadRequestProcessor {
         Ok((response, ThreadUnarchivedNotification { thread_id }))
     }
 
-    async fn thread_unarchive_response(
+    pub(super) async fn thread_unarchive_response(
         &self,
         params: ThreadUnarchiveParams,
     ) -> Result<(ThreadUnarchiveResponse, String), JSONRPCErrorError> {
@@ -2491,7 +2492,7 @@ impl ThreadRequestProcessor {
         Ok(ThreadApproveGuardianDeniedActionResponse {})
     }
 
-    async fn thread_list_response_inner(
+    pub(super) async fn thread_list_response_inner(
         &self,
         params: ThreadListParams,
     ) -> Result<ThreadListResponse, JSONRPCErrorError> {

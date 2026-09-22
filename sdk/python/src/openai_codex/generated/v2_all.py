@@ -6756,6 +6756,26 @@ class ThreadArchiveRequest(BaseModel):
     params: ThreadArchiveParams
 
 
+class ThreadTrashRequest(BaseModel):
+    model_config = ConfigDict(
+        populate_by_name=True,
+    )
+    id: RequestId
+    method: Annotated[Literal["thread/trash"], Field(title="Thread/trashRequestMethod")]
+    params: ThreadArchiveParams
+
+
+class ThreadTrashRestoreRequest(BaseModel):
+    model_config = ConfigDict(
+        populate_by_name=True,
+    )
+    id: RequestId
+    method: Annotated[
+        Literal["thread/trash/restore"], Field(title="Thread/trash/restoreRequestMethod")
+    ]
+    params: ThreadUnarchiveParams
+
+
 class ThreadDeleteRequest(BaseModel):
     model_config = ConfigDict(
         populate_by_name=True,
@@ -10405,6 +10425,15 @@ class ThreadForkRequest(BaseModel):
     params: ThreadForkParams
 
 
+class ThreadTrashListRequest(BaseModel):
+    model_config = ConfigDict(
+        populate_by_name=True,
+    )
+    id: RequestId
+    method: Annotated[Literal["thread/trash/list"], Field(title="Thread/trash/listRequestMethod")]
+    params: ThreadListParams
+
+
 class ThreadGoalSetRequest(BaseModel):
     model_config = ConfigDict(
         populate_by_name=True,
@@ -12391,6 +12420,9 @@ class ClientRequest(
         | ThreadResumeRequest
         | ThreadForkRequest
         | ThreadArchiveRequest
+        | ThreadTrashRequest
+        | ThreadTrashListRequest
+        | ThreadTrashRestoreRequest
         | ThreadDeleteRequest
         | ThreadUnsubscribeRequest
         | ThreadNameSetRequest
@@ -12501,6 +12533,9 @@ class ClientRequest(
         | ThreadResumeRequest
         | ThreadForkRequest
         | ThreadArchiveRequest
+        | ThreadTrashRequest
+        | ThreadTrashListRequest
+        | ThreadTrashRestoreRequest
         | ThreadDeleteRequest
         | ThreadUnsubscribeRequest
         | ThreadNameSetRequest

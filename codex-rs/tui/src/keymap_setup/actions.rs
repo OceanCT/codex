@@ -226,7 +226,7 @@ pub(super) const KEYMAP_ACTIONS: &[KeymapActionDescriptor] = &[
     action("agents", "Agents", "rename", "Rename the selected task."),
     action("agents", "Agents", "stop", "Stop the selected running task."),
     action("agents", "Agents", "archive", "Archive the selected task and its child agents."),
-    action("agents", "Agents", "delete", "Permanently delete the selected task and its child agents."),
+    action("agents", "Agents", "delete", "Move the selected task and its child agents to the 30-day bin."),
     action("agents", "Agents", "hide", "Hide the selected task until explicitly resumed."),
     action("agents", "Agents", "toggle_grouping", "Cycle task grouping by project, status, or model."),
     action("approval", "Approval", "open_fullscreen", "Open approval details fullscreen."),

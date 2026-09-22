@@ -28,7 +28,7 @@ impl ThreadRequestProcessor {
         }
     }
 
-    async fn thread_delete_response(
+    pub(super) async fn thread_delete_response(
         &self,
         params: ThreadDeleteParams,
         deleted_thread_ids: &mut Vec<String>,
@@ -62,7 +62,7 @@ impl ThreadRequestProcessor {
         Ok(ThreadDeleteResponse {})
     }
 
-    async fn send_thread_deleted_notifications(&self, deleted_thread_ids: Vec<String>) {
+    pub(super) async fn send_thread_deleted_notifications(&self, deleted_thread_ids: Vec<String>) {
         for thread_id in deleted_thread_ids {
             self.outgoing
                 .send_server_notification(ServerNotification::ThreadDeleted(

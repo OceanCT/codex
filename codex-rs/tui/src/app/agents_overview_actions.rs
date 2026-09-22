@@ -48,7 +48,7 @@ impl LifecycleProgress {
     fn header(&self) -> LifecycleHeader {
         let title = match self.0 {
             AgentsOverviewAction::Archive => "Archiving task…",
-            AgentsOverviewAction::Delete => "Deleting task…",
+            AgentsOverviewAction::Delete => "Moving task to bin (30 days)…",
         };
         LifecycleHeader(vec![
             title.bold().into(),
@@ -109,56 +109,15 @@ impl App {
         thread_id: ThreadId,
         action: AgentsOverviewAction,
     ) {
-        let Some(thread) = self
+        if self
             .agents_overview
             .threads
             .get(&thread_id)
-            .and_then(Option::as_ref)
-        else {
-            return;
-        };
-        let name = thread.name.as_deref().unwrap_or(&thread.preview);
-        let name = name
-            .trim()
-            .lines()
-            .next()
-            .filter(|name| !name.is_empty())
-            .unwrap_or("Untitled task");
-        let (title, description, label) = match action {
-            AgentsOverviewAction::Archive => (
-                format!("Archive “{name}”?"),
-                "This stops any running work in this task and its child agents, then archives them. Their history can be restored from the resume picker.",
-                "Archive task and child agents",
-            ),
-            AgentsOverviewAction::Delete => (
-                format!("Permanently delete “{name}”?"),
-                "This stops any running work in this task and its child agents, then permanently deletes their history. This cannot be undone.",
-                "Permanently delete task and child agents",
-            ),
-        };
-        self.chat_widget.show_selection_view(SelectionViewParams {
-            header: Box::new(LifecycleHeader(vec![
-                title.bold().into(),
-                description.dim().into(),
-            ])),
-            items: vec![
-                SelectionItem {
-                    name: "Cancel".to_string(),
-                    dismiss_on_select: true,
-                    ..Default::default()
-                },
-                SelectionItem {
-                    name: label.to_string(),
-                    actions: vec![Box::new(move |tx| {
-                        tx.send(AppEvent::RunAgentsOverviewAction { thread_id, action })
-                    })],
-                    dismiss_on_select: true,
-                    require_explicit_confirmation: action == AgentsOverviewAction::Delete,
-                    ..Default::default()
-                },
-            ],
-            ..SelectionViewParams::picker()
-        });
+            .is_some_and(Option::is_some)
+        {
+            self.app_event_tx
+                .send(AppEvent::RunAgentsOverviewAction { thread_id, action });
+        }
     }
 
     pub(super) async fn run_agents_overview_action(
@@ -190,7 +149,7 @@ impl App {
                 attempted = true;
                 match action {
                     AgentsOverviewAction::Archive => app_server.thread_archive(thread_id).await,
-                    AgentsOverviewAction::Delete => app_server.thread_delete(thread_id).await,
+                    AgentsOverviewAction::Delete => app_server.thread_trash(thread_id).await,
                 }
             }
             .await;
@@ -293,7 +252,7 @@ impl App {
         if let Err(error) = result {
             let verb = match action {
                 AgentsOverviewAction::Archive => "archive",
-                AgentsOverviewAction::Delete => "delete",
+                AgentsOverviewAction::Delete => "move to bin",
             };
             let mut header = vec![
                 format!("Could not {verb} task").red().bold().into(),

@@ -991,6 +991,8 @@ impl MessageProcessor {
             | ClientRequest::ThreadRevert { .. }
             | ClientRequest::ThreadSettingsUpdate { .. }
             | ClientRequest::TurnSettingsUpdate { .. }
+            | ClientRequest::ThreadTrash { .. }
+            | ClientRequest::ThreadTrashRestore { .. }
             | ClientRequest::ThreadDelete { .. }
             | ClientRequest::ThreadArchive { .. } => (Some(self.turn_admission.admit()?), false),
             ClientRequest::TurnStart { .. }
@@ -1321,6 +1323,17 @@ impl MessageProcessor {
                 self.thread_processor
                     .thread_archive(request_id.clone(), params)
                     .await
+            }
+            ClientRequest::ThreadTrash { params, .. } => {
+                self.thread_processor
+                    .thread_trash(request_id.clone(), params)
+                    .await
+            }
+            ClientRequest::ThreadTrashList { params, .. } => {
+                self.thread_processor.thread_trash_list(params).await
+            }
+            ClientRequest::ThreadTrashRestore { params, .. } => {
+                self.thread_processor.thread_trash_restore(params).await
             }
             ClientRequest::ThreadDelete { params, .. } => {
                 self.thread_processor

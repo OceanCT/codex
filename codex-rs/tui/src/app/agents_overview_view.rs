@@ -559,6 +559,13 @@ impl BottomPaneView for AgentsOverviewView {
             return;
         }
 
+        if key.code == KeyCode::Char('b')
+            && key.modifiers == KeyModifiers::CONTROL
+            && !self.state().editing_metadata()
+        {
+            self.app_event_tx.send(AppEvent::OpenAgentsBin);
+            return;
+        }
         if self.agents_keymap.resume.is_pressed(key) {
             self.app_event_tx.send(AppEvent::OpenResumePicker);
             return;

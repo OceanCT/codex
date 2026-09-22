@@ -2652,6 +2652,8 @@ impl App {
                 self.agents_overview.hidden_threads.insert(thread_id);
                 self.repaint_agents_overview();
             }
+            AppEvent::OpenAgentsBin => self.open_agents_bin(app_server).await,
+            AppEvent::RestoreAgentsBin { thread_id } => self.restore_agents_bin(app_server, thread_id).await,
             AppEvent::ConfirmAgentsOverviewAction { thread_id, action } => {
                 self.confirm_agents_overview_action(thread_id, action);
             }
