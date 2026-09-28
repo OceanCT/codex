@@ -85,12 +85,33 @@ Reference: https://iterm2.com/documentation-images.html
 
 ## Upstream Updates
 
+The current source includes the complete `rust-v0.157.1` stable release
+(`36650394c5`) and retains Y's recycle bin, empty-thread persistence, and native
+math/image rendering. The upgrade baseline is preserved on
+`backup/codex-y-before-0.157.1-20260928`.
+
+For this release, the Code Mode Host is the official `0.157.1` Apple Silicon
+release component. Its source is unchanged by Y. Install it with the explicit
+host override and run the installed-host smoke check described above.
+
+Installing selects the new binaries but does not restart an active daemon.
+Check `codexy app-server daemon version`; after active tasks finish, run
+`codexy app-server daemon restart` and reopen the terminal client to use the
+new runtime throughout.
+
 Keep personal changes on `oceanct/agents-recycle-bin`. Review upstream releases
 and commits before merging. The local daemon package uses a `local-` directory
 so it does not qualify for the public stable-release updater. Automated upstream
 checks are not configured yet.
 
 ## Validation
+
+The 0.157.1 upgrade passed 6 protocol/schema checks, 16 selected app-server
+lifecycle tests, 92 selected TUI tests, and 4 real LaTeX renderer tests. Both
+precomputed protocol bundles were regenerated after merging. Repository
+formatting and the CLI build passed with one Cargo build job. The official
+Code Mode Host archive matched the release SHA-256 and passed its protocol,
+JavaScript, and shell-callback smoke check.
 
 Empty-task lifecycle validation includes bin/restore across restart, idle unload
 followed by resume (both history modes), and storage failure followed by retry.
