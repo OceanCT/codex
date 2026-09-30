@@ -85,12 +85,12 @@ Reference: https://iterm2.com/documentation-images.html
 
 ## Upstream Updates
 
-The current source includes the complete `rust-v0.157.1` stable release
-(`36650394c5`) and retains Y's recycle bin, empty-thread persistence, and native
+The current source includes the complete `rust-v0.159.2` stable release
+(`ff6aec9694`) and retains Y's recycle bin, empty-thread persistence, and native
 math/image rendering. The upgrade baseline is preserved on
-`backup/codex-y-before-0.157.1-20260928`.
+`backup/codex-y-before-0.159.2-20260930`.
 
-For this release, the Code Mode Host is the official `0.157.1` Apple Silicon
+For this release, the Code Mode Host is the official `0.159.2` Apple Silicon
 release component. Its source is unchanged by Y. Install it with the explicit
 host override and run the installed-host smoke check described above.
 
@@ -105,6 +105,15 @@ so it does not qualify for the public stable-release updater. Automated upstream
 checks are not configured yet.
 
 ## Validation
+
+The 0.159.2 upgrade passed 4 protocol/schema checks, 92 selected TUI tests,
+9 selected app-server lifecycle tests, and 4 real LaTeX renderer tests. Both
+precomputed protocol bundles were regenerated. The native-image event consumer
+was adapted to the upstream Markdown parser refactor. Repository formatting and
+the Bazel lock update passed; the latter required no lockfile changes. The
+official 0.159.2 Code Mode Host passed its handshake, JavaScript, shell callback,
+and result-delivery smoke check. Cargo used one build job and Nextest ran one
+test at a time; these are focused checks, not a full workspace test run.
 
 The 0.157.1 upgrade passed 6 protocol/schema checks, 16 selected app-server
 lifecycle tests, 92 selected TUI tests, and 4 real LaTeX renderer tests. Both

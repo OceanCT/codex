@@ -2,3 +2,9 @@
 # This limits concurrent build jobs, not total CPU or memory usage.
 [build]
 jobs = 2
+
+[env]
+# Ask compatible jemalloc processes for transparent huge pages.
+# Cargo passes this to all child processes, including tests and cargo run.
+# An explicit MALLOC_CONF (even empty) keeps precedence.
+MALLOC_CONF = { value = "thp:always", force = false }
