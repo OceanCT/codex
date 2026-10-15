@@ -94,7 +94,7 @@ async fn picker_side_worktree_fork_and_cd_run_on_the_production_stack() -> Resul
         codex_home.path(),
         /*desktop*/ None,
     )?);
-    // Both launchers give codex-main and Tokio workers explicit 16 MiB stacks.
+    // Use the launcher's production stack budget, including CLI dispatch when available.
     let mut terminal = start(
         &root,
         codex_home,

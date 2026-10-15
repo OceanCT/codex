@@ -1,5 +1,7 @@
 // Aggregates all former standalone integration tests as modules.
 #[cfg(unix)]
+mod agents_stack;
+#[cfg(unix)]
 mod daemon_compatibility;
 #[cfg(unix)]
 mod directory_trust;

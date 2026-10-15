@@ -24,6 +24,12 @@ const MISSPELLED_APPLY_PATCH_ARG0: &str = "applypatch";
 const EXECVE_WRAPPER_ARG0: &str = "codex-execve-wrapper";
 const LOCK_FILENAME: &str = ".lock";
 
+// The CLI dispatcher stays on the block_on thread while the TUI polls nested
+// session-transition futures. In an unoptimized macOS build, opening a thread
+// from `agents` uses just over 16 MiB, including request serialization. Give
+// that one thread headroom without increasing every Tokio worker's stack.
+const MAIN_THREAD_STACK_SIZE_BYTES: usize = 32 * 1024 * 1024;
+
 #[derive(Clone, Debug, Default, Eq, PartialEq)]
 pub struct Arg0DispatchPaths {
     /// Stable path to the current Codex executable for child re-execs.
@@ -232,12 +238,11 @@ where
     let path_entry_guard = arg0_dispatch();
     let current_exe = std::env::current_exe().ok();
 
-    // Regular invocation. Run the async entry point on a thread with the same
-    // stack budget as Tokio workers; `Runtime::block_on` otherwise runs the
-    // top-level future on the caller's OS stack.
+    // Regular invocation. `Runtime::block_on` polls the CLI and TUI on this
+    // thread, whose nested frames need more headroom than a Tokio worker.
     let handle = std::thread::Builder::new()
         .name("codex-main".to_string())
-        .stack_size(THREAD_STACK_SIZE_BYTES)
+        .stack_size(MAIN_THREAD_STACK_SIZE_BYTES)
         .spawn(move || {
             let runtime = build_runtime()?;
             runtime.block_on(run_main_with_arg0_guard(
