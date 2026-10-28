@@ -76,11 +76,12 @@ async fn model_picker_profiles_switch_provider_and_restore_original_without_savi
             server.shutdown().await?;
             server = Box::pin(crate::start_embedded_app_server_for_picker(&app.config)).await?;
             let restored = server
-                .resume_thread(
+                .resume_thread_with_permission_overrides(
                     &app.local_settings,
                     app.config.clone(),
                     thread_id,
                     crate::app_server_session::ResumeModelSettings::RestoreFromThread,
+                    crate::resume_permissions::ResumePermissions::default(),
                 )
                 .await?;
             assert_eq!(
@@ -104,7 +105,7 @@ async fn model_picker_profiles_switch_provider_and_restore_original_without_savi
         AppEvent::SelectSessionModel {
             model: "picker-test-model".into(),
             effort: Some(ReasoningEffortConfig::High),
-                service_tier: None,
+            service_tier: None,
         },
     ))
     .await?;
@@ -136,7 +137,8 @@ async fn model_picker_profiles_display_alongside_existing_models() -> Result<()>
     crate::model_picker_profiles::extend(&mut models, &profiles);
     crate::model_picker_profiles::extend(&mut models, &profiles);
     assert_eq!(models.len(), count + 1);
-    models.retain(|model| model.model == "gpt-5.6-terra" || model.model == "picker-test-model");
+    let server_model = models.first().expect("server model catalog").model.clone();
+    models.retain(|model| model.model == server_model || model.model == "picker-test-model");
     app.chat_widget.open_model_popup_with_presets(models);
     insta::assert_snapshot!(
         "model_picker_with_custom_provider",

@@ -133,43 +133,10 @@ impl AppServerSession {
     pub(crate) async fn resume_thread(
         &mut self,
         local_settings: &crate::local_settings::LocalSettings,
-        mut config: Config,
+        config: Config,
         thread_id: ThreadId,
         model_settings: ResumeModelSettings,
     ) -> Result<AppServerStartedThread> {
-        if model_settings == ResumeModelSettings::RestoreFromThread {
-            let profiles = crate::model_picker_profiles::load(config.codex_home.as_path())?;
-            if !profiles.is_empty() {
-                let thread = self.thread_read(thread_id, false).await?;
-                if let Some(mut profile) = profiles
-                    .into_iter()
-                    .find(|profile| Some(&profile.preset.model) == thread.model.as_ref())
-                {
-                    config.model = thread.model;
-                    config.model_reasoning_effort = thread.reasoning_effort.clone();
-                    config.service_tier = profile
-                        .overrides
-                        .get("service_tier")
-                        .and_then(serde_json::Value::as_str)
-                        .map(str::to_string);
-                    if let Some(effort) = thread.reasoning_effort {
-                        profile.overrides.insert(
-                            "model_reasoning_effort".to_string(),
-                            serde_json::to_value(effort)?,
-                        );
-                    }
-                    return self
-                        .resume_thread_with_model_overrides(
-                            local_settings,
-                            config,
-                            thread_id,
-                            ResumeModelSettings::OverrideFromCurrentConfig,
-                            Some((profile.provider, profile.overrides)),
-                        )
-                        .await;
-                }
-            }
-        }
         self.resume_thread_with_model_overrides(
             local_settings,
             config,
@@ -221,12 +188,42 @@ impl AppServerSession {
     async fn resume_thread_with_overrides(
         &mut self,
         local_settings: &crate::local_settings::LocalSettings,
-        config: Config,
+        mut config: Config,
         thread_id: ThreadId,
         model_settings: ResumeModelSettings,
         permission_overrides: crate::resume_permissions::ResumePermissions,
-        provider_override: Option<(String, std::collections::HashMap<String, serde_json::Value>)>,
+        mut provider_override: Option<(
+            String,
+            std::collections::HashMap<String, serde_json::Value>,
+        )>,
     ) -> Result<AppServerStartedThread> {
+        // All entry points (startup, picker and agent center) restore local profiles.
+        if model_settings == ResumeModelSettings::RestoreFromThread && !self.uses_remote_workspace()
+        {
+            let profiles = crate::model_picker_profiles::load(config.codex_home.as_path())?;
+            if !profiles.is_empty() {
+                let thread = self.thread_read(thread_id, /*include_turns*/ false).await?;
+                if let Some(mut profile) = profiles.into_iter().find(|profile| {
+                    Some(&profile.preset.model) == thread.model.as_ref()
+                        && profile.provider == thread.model_provider
+                }) {
+                    config.model = thread.model;
+                    config.model_reasoning_effort = thread.reasoning_effort.clone();
+                    config.service_tier = profile
+                        .overrides
+                        .get("service_tier")
+                        .and_then(serde_json::Value::as_str)
+                        .map(str::to_string);
+                    if let Some(effort) = thread.reasoning_effort {
+                        profile.overrides.insert(
+                            "model_reasoning_effort".to_string(),
+                            serde_json::to_value(effort)?,
+                        );
+                    }
+                    provider_override = Some((profile.provider, profile.overrides));
+                }
+            }
+        }
         self.thread_tool_transport().validate_config(&config)?;
         let session_config = if matches!(
             model_settings,
@@ -248,16 +245,17 @@ impl AppServerSession {
             params.model_provider = self.explicit_model_provider(&config);
         }
         if let Some((provider, overrides)) = provider_override {
-            // Provider switches preserve the thread's permissions and workspace.
-            params.cwd = None;
-            params.runtime_workspace_roots = None;
-            params.approval_policy = None;
-            params.approvals_reviewer = None;
-            params.sandbox = None;
-            params.permissions = None;
+            // Explicit launch permissions still apply; profiles never supply permissions.
+            if !permission_overrides.workspace_roots {
+                params.cwd = None;
+            }
+            params.model = config.model.clone();
             params.model_provider = Some(provider);
             params.service_tier = Some(config.service_tier.clone());
-            params.config = Some(overrides);
+            params
+                .config
+                .get_or_insert_with(Default::default)
+                .extend(overrides);
         }
         self.thread_tool_transport()
             .configure_mcp(&mut params.config);

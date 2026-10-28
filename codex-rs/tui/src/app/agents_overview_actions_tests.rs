@@ -277,10 +277,8 @@ async fn archiving_selects_the_next_displayed_task() -> Result<()> {
                         .find(|event| matches!(event, AppEvent::ConfirmAgentsOverviewAction { .. }))
                         .expect("archive shortcut while editing");
                     Box::pin(app.handle_event(&mut tui, &mut app_server, confirmation)).await?;
-                    app.chat_widget.handle_key_event(KeyCode::Char('2').into());
-                    if action == AgentsOverviewAction::Delete {
-                        app.chat_widget.handle_key_event(KeyCode::Enter.into());
-                    }
+                    // Codexy dispatches recoverable lifecycle actions immediately.
+                    // Confirmation keys would become input in the retained search editor.
                     let confirmed = std::iter::from_fn(|| rx.try_recv().ok())
                         .find(|event| matches!(event, AppEvent::RunAgentsOverviewAction { .. }))
                         .expect("confirmed archive");

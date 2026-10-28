@@ -224,7 +224,7 @@ impl Renderable for AgentsOverviewView {
                         "Archiving task…  You can still browse.".to_owned()
                     }
                     AgentsOverviewAction::Delete => {
-                        "Deleting task…  You can still browse.".to_owned()
+                        "Moving task to bin (30 days)…  You can still browse.".to_owned()
                     }
                 })
             })

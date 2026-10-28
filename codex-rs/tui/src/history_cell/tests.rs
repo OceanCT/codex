@@ -599,6 +599,21 @@ fn image_generation_call_renders_saved_path() {
     );
 }
 
+#[test]
+fn image_generation_preserves_attachment_path_only_on_success() {
+    let saved_path = test_path_buf("/tmp/generated-codexy-image.png").abs();
+    for (status, expected) in [("completed", Some(saved_path.clone())), ("failed", None)] {
+        let cell = new_image_generation_call(
+            "image-call".to_string(),
+            status,
+            /*revised_prompt*/ None,
+            Some(saved_path.clone()),
+        );
+        assert_eq!(cell.image_path(), expected);
+        assert!(!cell.display_lines(/*width*/ 80).is_empty());
+    }
+}
+
 fn session_configured_event(model: &str) -> ThreadSessionState {
     ThreadSessionState {
         daybreak_enabled: false,

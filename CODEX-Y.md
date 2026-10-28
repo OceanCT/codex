@@ -34,6 +34,20 @@ persists its rollout before shutting down the old instance. This also covers
 empty threads whose rollout files have not been created yet. If persistence
 fails, the old instance stays loaded so the request can be retried.
 
+## Upstream compatibility
+
+The 0.165.0 integration retains the recycle bin alongside upstream Fork, pinning,
+repository filtering and directory grouping. Lifecycle requests keep the task
+list browsable; recoverable deletion still moves tasks to the 30-day bin.
+Generated images retain both native iTerm2 previews and upstream image attachment
+paths. Failed generations do not advertise an attachable image.
+
+Local provider profiles are restored through the common startup, session-picker
+and agent-center resume path. Ordinary sessions retain upstream server-provider
+defaults, and explicit launch permission overrides remain separate from profile
+model settings. An upstream source-file overlap is not by itself a feature
+conflict; merged behavior must pass regression tests before publication.
+
 ## Additional Model Providers
 
 `~/.codex-y/model-picker-profiles.json` can list named profiles to expose in

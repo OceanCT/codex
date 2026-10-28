@@ -25,7 +25,7 @@ expression: "screen(&view, width, height)"
   a          Archive
   h          Hide
   backspace  Move to bin
-  ctrl+b     Open bin / restore
+  ⌃b         Open bin / restore
 
   View
   tab/⇧tab  Filter
