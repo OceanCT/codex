@@ -3,6 +3,7 @@ import base64
 import hashlib
 import json
 import os
+import re
 from pathlib import Path
 from urllib.parse import quote
 from sync import api, next_release, STATE
@@ -25,6 +26,13 @@ def marker(key):
 def check(repository, retry=False):
     policy = json.loads(Path(__file__).with_name('policy.json').read_text())
     head = api(f"repos/{repository}/git/ref/heads/{policy['target_branch']}")['object']['sha']
+    candidate = os.environ.get('REVIEWED_CANDIDATE', '')
+    if candidate:
+        if not re.fullmatch(r'[0-9a-f]{40}', candidate):
+            raise ValueError('Reviewed candidate must be an exact full commit SHA')
+        api(f'repos/{repository}/commits/{candidate}')
+        return {'proceed': 'true', 'head': candidate, 'base': head,
+                'reason': 'Explicitly reviewed candidate; full validation required before publication.'}
     state = api(f'repos/{repository}/contents/{STATE}?ref={quote(head)}')
     current = json.loads(base64.b64decode(state['content']))['upstream_tag']
     release = next_release(current)

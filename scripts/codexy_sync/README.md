@@ -23,6 +23,12 @@ for an unchanged blocked version. Configuring SMTP alone does not trigger a retr
 Reports expire after seven days; Issues retain the reasons. Scheduled checks can
 be delayed by GitHub; integration latency is up to a day plus queue/build time.
 
+A maintainer can reconcile textual conflicts on a separate branch and dispatch
+with `reviewed_candidate=<full commit SHA>`. The controller checks target ancestry,
+the published stable release pin, upstream ancestry and required feature files,
+then runs the same build/regression/publication gate. This does not authorize
+publishing unvalidated code or overwriting a concurrently advanced target.
+
 ## Decision and validation
 
 - Fixes, additions and changes all enter the same compatibility gate. Release

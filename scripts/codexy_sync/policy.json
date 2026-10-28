@@ -55,6 +55,20 @@
         "scripts/smoke_codex_y_host.py",
         "codex-rs/tui/tests/suite/agents_stack.rs"
       ]
+    },
+    "会话内模型供应商选择与恢复": {
+      "paths": [
+        "codex-rs/tui/src/model_picker_profiles.rs",
+        "codex-rs/tui/src/app/model_provider_selection.rs",
+        "codex-rs/tui/src/app_server_session/",
+        "codex-rs/tui/src/app/event_dispatch.rs",
+        "codex-rs/tui/src/chatwidget/model_popups.rs"
+      ],
+      "required_files": [
+        "codex-rs/tui/src/model_picker_profiles.rs",
+        "codex-rs/tui/src/app/model_provider_selection.rs",
+        "codex-rs/tui/src/app/tests/model_provider_selection_tests.rs"
+      ]
     }
   },
   "pending_local_features": [

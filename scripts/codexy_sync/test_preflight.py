@@ -30,7 +30,7 @@ class PreflightTests(unittest.TestCase):
 
     def test_missing_smtp_records_attempt_without_sent_marker(self):
         report = {'status': 'review_required', 'tag': 'rust-v1.1.0', 'previous': 'rust-v1.0.0', 'base_head': 'a'}
-        with patch.dict(os.environ, {'CODEXY_ATTEMPT_KEY': 'test-key'}, clear=True), patch.object(notify, 'api', side_effect=[[], {'html_url': 'https://example.test/1'}]) as api, patch.object(notify, 'send_mail') as mail:
+        with patch('builtins.print'), patch.dict(os.environ, {'CODEXY_ATTEMPT_KEY': 'test-key'}, clear=True), patch.object(notify, 'api', side_effect=[[], {'html_url': 'https://example.test/1'}]) as api, patch.object(notify, 'send_mail') as mail:
             notify.notify(report, 'OceanCT/codex')
             body = api.call_args.args[2]['body']
             self.assertIn(preflight.marker('test-key'), body)

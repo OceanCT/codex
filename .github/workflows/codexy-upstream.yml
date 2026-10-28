@@ -4,6 +4,10 @@ on:
     - cron: '17 1 * * *'
   workflow_dispatch:
     inputs:
+      reviewed_candidate:
+        description: 'Exact SHA of a manually reconciled candidate; full validation still required'
+        type: string
+        default: ''
       retry:
         description: 'Retry a previously blocked attempt (also after configuring SMTP)'
         type: boolean
@@ -42,6 +46,7 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
           RETRY: ${{ inputs.retry }}
+          REVIEWED_CANDIDATE: ${{ inputs.reviewed_candidate }}
         run: python3 controller/scripts/codexy_sync/preflight.py
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd
         if: steps.preflight.outputs.proceed == 'true'
@@ -59,7 +64,14 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
           RELEASE_TAG: ${{ steps.preflight.outputs.tag }}
-        run: python3 controller/scripts/codexy_sync/sync.py prepare --repo candidate --tag "$RELEASE_TAG" --report "$RUNNER_TEMP/report.json"
+          REVIEWED_CANDIDATE: ${{ inputs.reviewed_candidate }}
+          BASE_HEAD: ${{ steps.preflight.outputs.base }}
+        run: |
+          if [ -n "$REVIEWED_CANDIDATE" ]; then
+            python3 controller/scripts/codexy_sync/reviewed.py --repo candidate --report "$RUNNER_TEMP/report.json"
+          else
+            python3 controller/scripts/codexy_sync/sync.py prepare --repo candidate --tag "$RELEASE_TAG" --report "$RUNNER_TEMP/report.json"
+          fi
       - name: Install build and renderer tools
         if: steps.prepare.outputs.status == 'ready' && !inputs.dry_run
         id: setup
