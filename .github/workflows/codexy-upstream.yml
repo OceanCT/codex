@@ -1,0 +1,81 @@
+name: Codexy upstream sync
+on:
+  schedule:
+    - cron: '17,47 * * * *'
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: 'Evaluate and report without advancing the Codexy branch'
+        type: boolean
+        default: false
+permissions:
+  contents: read
+concurrency:
+  group: codexy-upstream-sync
+  cancel-in-progress: false
+jobs:
+  sync:
+    if: github.repository == 'OceanCT/codex'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 180
+    permissions:
+      contents: write
+      issues: write
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd
+        with:
+          path: controller
+          persist-credentials: false
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd
+        with:
+          ref: oceanct/agents-recycle-bin
+          path: candidate
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Test synchronization decisions
+        run: python3 -m unittest discover -s controller/scripts/codexy_sync -p 'test_*.py' -v
+      - name: Prepare next published stable release
+        id: prepare
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: python3 controller/scripts/codexy_sync/sync.py prepare --repo candidate --report "$RUNNER_TEMP/report.json"
+      - name: Install build and renderer tools
+        if: steps.prepare.outputs.status == 'ready' && !inputs.dry_run
+        id: setup
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends build-essential pkg-config libssl-dev libcap-dev libasound2-dev bubblewrap texlive-latex-extra poppler-utils
+          cargo install --locked just cargo-nextest
+      - name: Build and verify Codexy features
+        if: steps.prepare.outputs.status == 'ready' && !inputs.dry_run
+        id: validate
+        working-directory: candidate
+        run: bash ../controller/scripts/codexy_sync/validate.sh
+      - name: Publish only the validated unchanged candidate
+        if: always() && steps.prepare.outputs.status == 'ready' && !inputs.dry_run
+        env:
+          GH_TOKEN: ${{ github.token }}
+          VALIDATION: ${{ steps.validate.outcome }}
+        run: |
+          gh auth setup-git
+          python3 controller/scripts/codexy_sync/sync.py finish --repo candidate --report "$RUNNER_TEMP/report.json" --validation "$VALIDATION" --publish
+      - name: Report conflicts and send email
+        if: always() && steps.prepare.outcome == 'success'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          SMTP_HOST: ${{ secrets.SMTP_HOST }}
+          SMTP_PORT: ${{ secrets.SMTP_PORT }}
+          SMTP_USERNAME: ${{ secrets.SMTP_USERNAME }}
+          SMTP_PASSWORD: ${{ secrets.SMTP_PASSWORD }}
+          SMTP_FROM: ${{ secrets.SMTP_FROM }}
+        run: python3 controller/scripts/codexy_sync/notify.py "$RUNNER_TEMP/report.json"
+      - name: Publish run summary
+        if: always()
+        run: |
+          if [ -f "$RUNNER_TEMP/report.md" ]; then cat "$RUNNER_TEMP/report.md" >> "$GITHUB_STEP_SUMMARY"; fi
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        if: always()
+        with:
+          name: codexy-upstream-report
+          path: ${{ runner.temp }}/report.*
+          if-no-files-found: ignore
