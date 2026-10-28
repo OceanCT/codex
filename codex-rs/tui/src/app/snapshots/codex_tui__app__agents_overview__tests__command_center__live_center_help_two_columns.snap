@@ -23,6 +23,10 @@ expression: "screen(&view, width, height)"
                        f              Search
                        g              Group
 
+                      View
+                      tab/⇧tab  Filter
+                      f3        Search
+                      g         Group
 
 
   esc back
