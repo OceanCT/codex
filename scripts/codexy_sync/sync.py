@@ -6,6 +6,7 @@ from pathlib import Path
 import re
 import subprocess
 import tempfile
+import tomllib
 
 STATE = '.codexy-upstream.json'
 TAG = re.compile(r'rust-v(\d+)\.(\d+)\.(\d+)$')
@@ -101,14 +102,44 @@ def stamp_version(repo, tag):
     match = re.search(pattern, text)
     if not match:
         raise ValueError('Cannot locate workspace version; manual review required')
-    old, new = match.group(2), tag.removeprefix('rust-v')
+    new = tag.removeprefix('rust-v')
     manifest.write_text(re.sub(pattern, lambda m: m.group(1) + new + m.group(3), text, count=1))
+    workspace = tomllib.loads(text)['workspace']
+    inherited, visited = set(), set()
+    manifests = [manifest]
+    for member in workspace['members']:
+        manifests.extend(p / 'Cargo.toml' for p in manifest.parent.glob(member))
+    while manifests:
+        current = manifests.pop().resolve()
+        if current in visited or not current.is_file() or not current.is_relative_to(manifest.parent.resolve()):
+            continue
+        visited.add(current)
+        data = tomllib.loads(current.read_text())
+        package = data.get('package', {})
+        if package.get('version') == {'workspace': True}:
+            inherited.add(package['name'])
+        tables = [data]
+        while tables:
+            table = tables.pop()
+            for key, value in table.items():
+                if key in ('dependencies', 'dev-dependencies', 'build-dependencies') and isinstance(value, dict):
+                    manifests.extend(current.parent / dep['path'] / 'Cargo.toml'
+                                     for dep in value.values() if isinstance(dep, dict) and 'path' in dep)
+                if isinstance(value, dict):
+                    tables.append(value)
     lock = repo / 'codex-rs/Cargo.lock'
     parts = lock.read_text().split('\n[[package]]\n')
+    old_ids = {}
     for i, block in enumerate(parts[1:], 1):
-        if not re.search(r'^source = ', block, re.MULTILINE):
-            parts[i] = re.sub(r'^version = "' + re.escape(old) + r'"$',
-                              f'version = "{new}"', block, count=1, flags=re.MULTILINE)
+        package = tomllib.loads(block)
+        if 'source' not in package and package['name'] in inherited:
+            old_ids[f"{package['name']} {package['version']}"] = f"{package['name']} {new}"
+            parts[i] = re.sub(r'^version = "[^"\n]+"$', f'version = "{new}"', block, count=1, flags=re.MULTILINE)
+    # Cargo qualifies dependency entries when a package name is ambiguous.
+    for i, block in enumerate(parts[1:], 1):
+        for old_id, new_id in old_ids.items():
+            block = block.replace(f'"{old_id}"', f'"{new_id}"')
+        parts[i] = block
     lock.write_text('\n[[package]]\n'.join(parts))
     git(repo, 'add', 'codex-rs/Cargo.toml', 'codex-rs/Cargo.lock')
 

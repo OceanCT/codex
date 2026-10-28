@@ -54,11 +54,16 @@ class MergeTests(unittest.TestCase):
 
     def test_version_stamp_updates_workspace_packages_only(self):
         (self.repo / 'codex-rs').mkdir()
-        self.write('codex-rs/Cargo.toml', '[workspace.package]\nversion = "1.0.0"\n')
-        self.write('codex-rs/Cargo.lock', 'version = 4\n[[package]]\nname = "local"\nversion = "1.0.0"\n[[package]]\nname = "external"\nversion = "1.0.0"\nsource = "registry+example"\n')
+        self.write('codex-rs/Cargo.toml', '[workspace]\nmembers = ["local"]\n[workspace.package]\nversion = "1.1.0"\n')
+        (self.repo / 'codex-rs/local').mkdir()
+        self.write('codex-rs/local/Cargo.toml', '[package]\nname = "local"\nversion.workspace = true\n[dev-dependencies]\nhelper = {path = "../helper"}\n')
+        (self.repo / 'codex-rs/helper').mkdir()
+        self.write('codex-rs/helper/Cargo.toml', '[package]\nname = "helper"\nversion.workspace = true\n')
+        self.write('codex-rs/Cargo.lock', 'version = 4\n[[package]]\nname = "helper"\nversion = "1.0.0"\n[[package]]\nname = "local"\nversion = "1.0.0"\n[[package]]\nname = "external"\nversion = "1.0.0"\nsource = "registry+example"\n')
         sync.stamp_version(self.repo, 'rust-v1.1.0')
         lock = (self.repo / 'codex-rs/Cargo.lock').read_text()
         self.assertIn('name = "local"\nversion = "1.1.0"', lock)
+        self.assertIn('name = "helper"\nversion = "1.1.0"', lock)
         self.assertIn('name = "external"\nversion = "1.0.0"', lock)
 
     def test_new_feature_merges_and_preserves_fork(self):
