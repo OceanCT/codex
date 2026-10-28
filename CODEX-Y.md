@@ -85,12 +85,11 @@ Reference: https://iterm2.com/documentation-images.html
 
 ## Upstream Updates
 
-The current source includes the complete `rust-v0.159.2` stable release
-(`ff6aec9694`) and retains Y's recycle bin, empty-thread persistence, and native
-math/image rendering. The upgrade baseline is preserved on
+The `rust-v0.159.2` upgrade (`ff6aec9694`) retained Y's recycle bin, empty-thread
+persistence, and native math/image rendering. The upgrade baseline is preserved on
 `backup/codex-y-before-0.159.2-20260930`.
 
-For this release, the Code Mode Host is the official `0.159.2` Apple Silicon
+For that upgrade, the Code Mode Host was the official `0.159.2` Apple Silicon
 release component. Its source is unchanged by Y. Install it with the explicit
 host override and run the installed-host smoke check described above.
 
@@ -99,10 +98,20 @@ Check `codexy app-server daemon version`; after active tasks finish, run
 `codexy app-server daemon restart` and reopen the terminal client to use the
 new runtime throughout.
 
-Keep personal changes on `oceanct/agents-recycle-bin`. Review upstream releases
-and commits before merging. The local daemon package uses a `local-` directory
-so it does not qualify for the public stable-release updater. Automated upstream
-checks are not configured yet.
+Keep personal changes on `oceanct/agents-recycle-bin`. The default branch of
+`OceanCT/codex` hosts the **Codexy upstream sync** GitHub Actions workflow. It
+checks published stable releases every 30 minutes, in version order. Compatible
+candidates advance this branch only after the CLI/host build and focused Codexy
+regressions pass. `.codexy-upstream.json` records the integrated upstream release.
+
+Conflicts and failed validation leave the branch unchanged and produce an Issue
+with affected features, evidence and run logs. Email to `oceanct17@gmail.com`
+requires the repository's SMTP Secrets. See
+[synchronization configuration](https://github.com/OceanCT/codex/blob/main/scripts/codexy_sync/README.md).
+
+Source synchronization does not install local binaries or restart active tasks.
+The local daemon package uses a `local-` directory, so it does not qualify for the
+public stable-release updater.
 
 ## Validation
 
