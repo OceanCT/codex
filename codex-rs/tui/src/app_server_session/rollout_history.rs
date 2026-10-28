@@ -189,6 +189,45 @@ impl AppServerSession {
         model_settings: ResumeModelSettings,
         provider_override: Option<(String, std::collections::HashMap<String, serde_json::Value>)>,
     ) -> Result<AppServerStartedThread> {
+        Box::pin(self.resume_thread_with_overrides(
+            local_settings,
+            config,
+            thread_id,
+            model_settings,
+            crate::resume_permissions::ResumePermissions::default(),
+            provider_override,
+        ))
+        .await
+    }
+
+    pub(crate) async fn resume_thread_with_permission_overrides(
+        &mut self,
+        local_settings: &crate::local_settings::LocalSettings,
+        config: Config,
+        thread_id: ThreadId,
+        model_settings: ResumeModelSettings,
+        permission_overrides: crate::resume_permissions::ResumePermissions,
+    ) -> Result<AppServerStartedThread> {
+        Box::pin(self.resume_thread_with_overrides(
+            local_settings,
+            config,
+            thread_id,
+            model_settings,
+            permission_overrides,
+            /*provider_override*/ None,
+        ))
+        .await
+    }
+
+    async fn resume_thread_with_overrides(
+        &mut self,
+        local_settings: &crate::local_settings::LocalSettings,
+        config: Config,
+        thread_id: ThreadId,
+        model_settings: ResumeModelSettings,
+        permission_overrides: crate::resume_permissions::ResumePermissions,
+        provider_override: Option<(String, std::collections::HashMap<String, serde_json::Value>)>,
+    ) -> Result<AppServerStartedThread> {
         let session_config = if matches!(
             model_settings,
             ResumeModelSettings::RestoreFromThread | ResumeModelSettings::PreserveExistingThread
@@ -203,7 +242,11 @@ impl AppServerSession {
             self.thread_params_mode(),
             self.remote_cwd_override.as_deref(),
             model_settings,
+            permission_overrides,
         );
+        if model_settings == ResumeModelSettings::OverrideFromCurrentConfig {
+            params.model_provider = self.explicit_model_provider(&config);
+        }
         if let Some((provider, overrides)) = provider_override {
             // Provider switches preserve the thread's permissions and workspace.
             params.cwd = None;
