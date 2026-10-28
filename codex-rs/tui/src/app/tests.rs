@@ -52,6 +52,8 @@ mod misalignment_policy;
 mod model_catalog;
 #[path = "tests/model_defaults_tests.rs"]
 mod model_defaults;
+#[path = "tests/model_provider_selection_tests.rs"]
+mod model_provider_selection;
 #[path = "tests/pagination_completion_tests.rs"]
 mod pagination_completion_tests;
 #[path = "tests/patch_approval_tests.rs"]

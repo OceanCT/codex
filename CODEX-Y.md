@@ -34,6 +34,22 @@ persists its rollout before shutting down the old instance. This also covers
 empty threads whose rollout files have not been created yet. If persistence
 fails, the old instance stays loaded so the request can be retried.
 
+## Additional Model Providers
+
+`~/.codex-y/model-picker-profiles.json` can list named profiles to expose in
+`/model` alongside the default provider, for example `["deepseek", "deepseek-pro"]`.
+Each `<name>.config.toml` supplies `model`, `model_provider`, and
+`model_catalog_json`, plus its provider definition. Only model/provider settings,
+web search mode, and service tier are forwarded; profile permission settings are
+not imported. Profile names may contain letters, digits, hyphens, and underscores.
+
+Provider selections apply to the current idle conversation and preserve its
+history and input draft. They do not replace saved startup defaults. A running
+turn must finish first; a thread observed by another client cannot be rebuilt.
+Local profiles are not applied to remote workspaces. Reopening a conversation
+restores its selected profile and reasoning effort. After installing an updated
+client/server, restart the shared daemon when tasks are idle and reopen the TUI.
+
 ## Recycle Bin
 
 - Ctrl+K moves a task and its child agents to the bin without confirmation.

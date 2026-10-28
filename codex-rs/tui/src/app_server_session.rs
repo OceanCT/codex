@@ -323,6 +323,7 @@ pub(crate) struct AppServerSession {
     thread_settings_update_supported: bool,
     default_model: Option<String>,
     available_models: Vec<ModelPreset>,
+    picker_profiles: Vec<crate::model_picker_profiles::PickerProfile>,
     managed_new_thread_defaults: Option<NewThreadModelDefaults>,
     external_agent_config_import_id: Mutex<Option<String>>,
     dynamic_tool_mcp: Option<Arc<DynamicToolMcpServer>>,
@@ -433,6 +434,7 @@ impl AppServerSession {
             thread_settings_update_supported: true,
             default_model: None,
             available_models: Vec::new(),
+            picker_profiles: Vec::new(),
             managed_new_thread_defaults: None,
             external_agent_config_import_id: Mutex::default(),
             dynamic_tool_mcp: None,
@@ -635,11 +637,13 @@ impl AppServerSession {
             .requirements
             .and_then(|requirements| requirements.models)
             .and_then(|models| models.new_thread);
-        let available_models = models
+        self.picker_profiles = crate::model_picker_profiles::load(config.codex_home.as_path())?;
+        let mut available_models = models
             .data
             .into_iter()
             .map(model_preset_from_api_model)
             .collect::<Vec<_>>();
+        crate::model_picker_profiles::extend(&mut available_models, &self.picker_profiles);
         let default_model = config
             .model
             .clone()

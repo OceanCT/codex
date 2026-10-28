@@ -55,7 +55,12 @@ impl ChatWidget {
         let keymap = self.bottom_pane.list_keymap();
         let mut hints = Vec::new();
         if let Some(accept) = keymap.primary_hint(ListAction::Accept) {
-            let label = if effort == Some(ReasoningEffortConfig::Ultra) {
+            let label = if effort == Some(ReasoningEffortConfig::Ultra)
+                || crate::model_picker_profiles::needs_provider_selection(
+                    self.config.codex_home.as_path(),
+                    self.current_model(),
+                    &model,
+                ) {
                 " apply · "
             } else {
                 " default · "

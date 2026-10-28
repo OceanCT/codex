@@ -2344,7 +2344,13 @@ impl App {
             }
             AppEvent::SelectSessionModel { model, effort } => {
                 self.app_event_tx.send(AppEvent::FollowTranscript);
-                self.select_session_model(app_server, model, effort).await;
+                if crate::model_picker_profiles::needs_provider_selection(
+                    self.config.codex_home.as_path(), self.chat_widget.current_model(), &model,
+                ) {
+                    self.select_provider_model(tui, app_server, model, effort).await;
+                } else {
+                    self.select_session_model(app_server, model, effort).await;
+                }
             }
             AppEvent::CyberModelAutoReviewNotice => {
                 self.chat_widget.add_warning_message(

@@ -4291,6 +4291,14 @@ impl ThreadRequestProcessor {
         } else if let Ok(existing_thread_id) = ThreadId::from_string(&params.thread_id)
             && let Ok(existing_thread) = self.thread_manager.get_thread(existing_thread_id).await
         {
+            // A fresh thread may still have a deferred rollout. Materialize it before
+            // reading resume metadata, including when changing providers before the first turn.
+            if params.model_provider.is_some() {
+                self.thread_store
+                    .persist_thread(existing_thread_id, PersistContext::Standard)
+                    .await
+                    .map_err(thread_store_resume_read_error)?;
+            }
             let source_thread = self
                 .read_stored_thread_for_resume(
                     &params.thread_id,

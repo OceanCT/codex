@@ -231,6 +231,7 @@ mod loaded_threads;
 mod managed_worktree_creation;
 mod misalignment_policy;
 mod model_defaults;
+mod model_provider_selection;
 mod new_session;
 mod turn_tips;
 pub(crate) use new_session::has_launch_setting;

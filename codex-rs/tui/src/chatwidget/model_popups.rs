@@ -299,10 +299,20 @@ impl ChatWidget {
         let warning = effort_for_action
             .as_ref()
             .and_then(|effort| self.ultra_reasoning_concurrency_warning(effort));
+        let provider_selection = crate::model_picker_profiles::needs_provider_selection(
+            self.config.codex_home.as_path(),
+            self.current_model(),
+            &model_for_action,
+        );
         let thread_id = self.thread_id();
         let sparkle_thread = self.sparkle_thread_for_picker_action(&model_for_action);
         vec![Box::new(move |tx| {
-            if model_for_action == LUNA_RESERVE_MODEL {
+            if provider_selection {
+                tx.send(AppEvent::SelectSessionModel {
+                    model: model_for_action.clone(),
+                    effort: effort_for_action.clone(),
+                });
+            } else if model_for_action == LUNA_RESERVE_MODEL {
                 // Reserve is temporary: update the active task without persisting a model default.
                 if let Some(thread_id) = thread_id {
                     tx.send(AppEvent::UpdateLunaReserveReasoning {
