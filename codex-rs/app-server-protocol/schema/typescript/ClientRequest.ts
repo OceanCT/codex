@@ -24,6 +24,7 @@ import type { ExperimentalFeatureListParams } from "./v2/ExperimentalFeatureList
 import type { ExternalAgentConfigDetectParams } from "./v2/ExternalAgentConfigDetectParams";
 import type { ExternalAgentConfigImportHistoryRecordParams } from "./v2/ExternalAgentConfigImportHistoryRecordParams";
 import type { ExternalAgentConfigImportParams } from "./v2/ExternalAgentConfigImportParams";
+import type { FeedbackSaveParams } from "./v2/FeedbackSaveParams";
 import type { FeedbackUploadParams } from "./v2/FeedbackUploadParams";
 import type { FsCopyParams } from "./v2/FsCopyParams";
 import type { FsCreateDirectoryParams } from "./v2/FsCreateDirectoryParams";

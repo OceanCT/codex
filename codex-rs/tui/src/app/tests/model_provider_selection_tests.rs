@@ -50,6 +50,7 @@ async fn model_picker_profiles_switch_provider_and_restore_original_without_savi
             AppEvent::SelectSessionModel {
                 model: model.into(),
                 effort: Some(ReasoningEffortConfig::High),
+                service_tier: None,
             },
         ))
         .await?;
@@ -103,6 +104,7 @@ async fn model_picker_profiles_switch_provider_and_restore_original_without_savi
         AppEvent::SelectSessionModel {
             model: "picker-test-model".into(),
             effort: Some(ReasoningEffortConfig::High),
+                service_tier: None,
         },
     ))
     .await?;

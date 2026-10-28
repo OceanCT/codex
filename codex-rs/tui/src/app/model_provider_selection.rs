@@ -16,9 +16,10 @@ impl App {
         app_server: &mut AppServerSession,
         model: String,
         effort: Option<ReasoningEffort>,
+        service_tier: Option<String>,
     ) {
         if let Err(error) = self
-            .apply_provider_model(tui, app_server, model, effort)
+            .apply_provider_model(tui, app_server, model, effort, service_tier)
             .await
         {
             self.chat_widget
@@ -32,6 +33,7 @@ impl App {
         app_server: &mut AppServerSession,
         model: String,
         effort: Option<ReasoningEffort>,
+        service_tier: Option<String>,
     ) -> Result<()> {
         if self.chat_widget.is_user_turn_pending_or_running() {
             color_eyre::eyre::bail!(
@@ -65,6 +67,10 @@ impl App {
                 std::collections::HashMap::new(),
             ),
         };
+        if let Some(service_tier) = service_tier {
+            config.service_tier = Some(service_tier.clone());
+            overrides.insert("service_tier".to_string(), service_tier.into());
+        }
         if let Some(effort) = effort.as_ref() {
             overrides.insert(
                 "model_reasoning_effort".to_string(),

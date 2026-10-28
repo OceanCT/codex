@@ -309,6 +309,7 @@ impl ChatWidget {
                 tx.send(AppEvent::SelectSessionModel {
                     model: model_for_action.clone(),
                     effort: effort_for_action.clone(),
+                    service_tier: None,
                 });
             } else if model_for_action == LUNA_RESERVE_MODEL {
                 // Reserve is temporary: update the active task without persisting a model default.
