@@ -100,7 +100,7 @@ new runtime throughout.
 
 Keep personal changes on `oceanct/agents-recycle-bin`. The default branch of
 `OceanCT/codex` hosts the **Codexy upstream sync** GitHub Actions workflow. It
-checks published stable releases every 30 minutes, in version order. Compatible
+checks published stable releases once daily (01:17 UTC; manual retries are available), in version order. Compatible
 candidates advance this branch only after the CLI/host build and focused Codexy
 regressions pass. `.codexy-upstream.json` records the integrated upstream release.
 
