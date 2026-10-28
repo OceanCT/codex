@@ -9,6 +9,7 @@ import ssl
 import sys
 
 from sync import api, markdown
+from preflight import marker
 
 
 def send_mail(subject, body, recipient):
@@ -48,13 +49,18 @@ def notify(report, repository):
             break
     else:
         raise RuntimeError('Issue scan limit exceeded; refusing duplicate notifications')
-    marker = f'<!-- codexy-email-sent:{fingerprint} -->'
-    sent = issue is not None and marker in (issue.get('body') or '')
+    marker_sent = f'<!-- codexy-email-sent:{fingerprint} -->'
+    sent = issue is not None and marker_sent in (issue.get('body') or '')
     run_id = os.environ.get('GITHUB_RUN_ID')
     run_url = (f'https://github.com/{repository}/actions/runs/{run_id}' if run_id else
                f'https://github.com/{repository}/actions/workflows/codexy-upstream.yml')
     content = body[:55000] + f'\n\n运行日志：{run_url}\n完整文件列表及合并详情见 workflow artifact。\n'
+    key = os.environ.get('CODEXY_ATTEMPT_KEY')
+    if key:
+        content += '\n' + marker(key)
     if sent:
+        if key and marker(key) not in (issue.get('body') or ''):
+            api(f"repos/{repository}/issues/{issue['number']}", 'PATCH', {'body': content + '\n' + marker_sent})
         print('Conflict already reported and emailed; no duplicate mail.')
         return
     if issue is None:
@@ -62,9 +68,16 @@ def notify(report, repository):
     else:
         issue = api(f"repos/{repository}/issues/{issue['number']}", 'PATCH', {'body': content})
     print(f"Report: {issue['html_url']}")
+    if not all(os.environ.get(k) for k in ('SMTP_HOST', 'SMTP_PORT', 'SMTP_USERNAME', 'SMTP_PASSWORD', 'SMTP_FROM')):
+        warning = 'Email NOT sent: SMTP secrets are not configured. Configure all five SMTP secrets and run manually with retry=true.'
+        print('::warning::' + warning)
+        if os.environ.get('GITHUB_STEP_SUMMARY'):
+            with open(os.environ['GITHUB_STEP_SUMMARY'], 'a') as summary:
+                summary.write(warning + '\n')
+        return
     recipient = json.loads(Path(__file__).with_name('policy.json').read_text())['recipient']
     send_mail(title, body + f"\n{issue['html_url']}\n{run_url}\n", recipient)
-    api(f"repos/{repository}/issues/{issue['number']}", 'PATCH', {'body': content + '\n' + marker})
+    api(f"repos/{repository}/issues/{issue['number']}", 'PATCH', {'body': content + '\n' + marker_sent})
     print(f'Email accepted by SMTP server for {recipient}.')
 
 

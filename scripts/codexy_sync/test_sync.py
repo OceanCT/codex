@@ -195,7 +195,7 @@ class MailTests(unittest.TestCase):
     def test_failed_delivery_does_not_set_sent_marker(self):
         report = {'status': 'conflict', 'tag': 'rust-v1.1.0', 'previous': 'rust-v1.0.0', 'base_head': 'a', 'conflicts': ['shared.txt']}
         issue = {'number': 1, 'html_url': 'https://example.test/1'}
-        with patch.object(notify, 'api', side_effect=[[], issue]) as api, patch.object(notify, 'send_mail', side_effect=RuntimeError('SMTP failed')):
+        with patch.dict(os.environ, {k: 'test' for k in ('SMTP_HOST', 'SMTP_PORT', 'SMTP_USERNAME', 'SMTP_PASSWORD', 'SMTP_FROM')}), patch.object(notify, 'api', side_effect=[[], issue]) as api, patch.object(notify, 'send_mail', side_effect=RuntimeError('SMTP failed')):
             with self.assertRaisesRegex(RuntimeError, 'SMTP failed'):
                 notify.notify(report, 'OceanCT/codex')
             self.assertEqual(api.call_count, 2)

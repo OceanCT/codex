@@ -1,9 +1,13 @@
 name: Codexy upstream sync
 on:
   schedule:
-    - cron: '17,47 * * * *'
+    - cron: '17 1 * * *'
   workflow_dispatch:
     inputs:
+      retry:
+        description: 'Retry a previously blocked attempt (also after configuring SMTP)'
+        type: boolean
+        default: false
       dry_run:
         description: 'Evaluate and report without advancing the Codexy branch'
         type: boolean
@@ -30,19 +34,32 @@ jobs:
         with:
           path: controller
           persist-credentials: false
+          sparse-checkout: |
+            scripts/codexy_sync
+            .github/workflows
+      - name: Check release and previous attempt before fetching history
+        id: preflight
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RETRY: ${{ inputs.retry }}
+        run: python3 controller/scripts/codexy_sync/preflight.py
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd
+        if: steps.preflight.outputs.proceed == 'true'
         with:
-          ref: oceanct/agents-recycle-bin
+          ref: ${{ steps.preflight.outputs.head }}
           path: candidate
           fetch-depth: 0
           persist-credentials: false
       - name: Test synchronization decisions
+        if: steps.preflight.outputs.proceed == 'true'
         run: python3 -m unittest discover -s controller/scripts/codexy_sync -p 'test_*.py' -v
       - name: Prepare next published stable release
         id: prepare
+        if: steps.preflight.outputs.proceed == 'true'
         env:
           GH_TOKEN: ${{ github.token }}
-        run: python3 controller/scripts/codexy_sync/sync.py prepare --repo candidate --report "$RUNNER_TEMP/report.json"
+          RELEASE_TAG: ${{ steps.preflight.outputs.tag }}
+        run: python3 controller/scripts/codexy_sync/sync.py prepare --repo candidate --tag "$RELEASE_TAG" --report "$RUNNER_TEMP/report.json"
       - name: Install build and renderer tools
         if: steps.prepare.outputs.status == 'ready' && !inputs.dry_run
         id: setup
@@ -78,6 +95,7 @@ jobs:
         if: always() && steps.prepare.outcome == 'success'
         env:
           GH_TOKEN: ${{ github.token }}
+          CODEXY_ATTEMPT_KEY: ${{ steps.preflight.outputs.key }}
           SMTP_HOST: ${{ secrets.SMTP_HOST }}
           SMTP_PORT: ${{ secrets.SMTP_PORT }}
           SMTP_USERNAME: ${{ secrets.SMTP_USERNAME }}
@@ -91,6 +109,7 @@ jobs:
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         if: always()
         with:
+          retention-days: 7
           name: codexy-upstream-report
           path: ${{ runner.temp }}/report.*
           if-no-files-found: ignore

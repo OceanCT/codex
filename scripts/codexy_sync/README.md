@@ -1,7 +1,7 @@
 # Codexy upstream synchronization
 
 The controller lives on `OceanCT/codex`'s default branch. It checks published
-stable `openai/codex` releases every 30 minutes (`:17` and `:47` UTC) and can be
+stable `openai/codex` releases once daily (01:17 UTC / 09:17 China time) and can be
 started manually in Actions. GitHub may delay scheduled runs. An upstream
 repository's release does not trigger this fork's `release` event.
 
@@ -9,8 +9,19 @@ The target is `oceanct/agents-recycle-bin`. `.codexy-upstream.json` on that
 branch pins the last integrated release and commit. Each run selects the next
 published stable version numerically; alpha/draft/unpublished tags are skipped.
 A blocked version is never marked integrated or silently skipped. Subsequent
-releases wait for it. Re-run after resolving the blocker. `dry_run` still writes
+releases wait for it. Run manually with `retry=true` after resolving the blocker. `dry_run` still writes
 conflict reports and attempts notification, but never builds or publishes.
+
+## Resource limits
+
+A sparse controller checkout checks the target SHA and next release before fetching
+candidate history. Blocked attempts are recorded on their Issues, keyed by target
+SHA, release metadata, policy, integration/validation scripts and workflow. The
+same attempt is skipped even if its Issue is closed; a changed key or explicit
+`retry=true` permits another evaluation. No repeated builds or mail attempts occur
+for an unchanged blocked version. Configuring SMTP alone does not trigger a retry.
+Reports expire after seven days; Issues retain the reasons. Scheduled checks can
+be delayed by GitHub; integration latency is up to a day plus queue/build time.
 
 ## Decision and validation
 
@@ -48,8 +59,8 @@ Port 465 uses implicit TLS; other ports require STARTTLS. The fixed recipient is
 `oceanct17@gmail.com`. Credentials never appear in reports or stdout.
 
 A sent marker is saved on the issue only after SMTP accepts the message; repeated
-runs do not resend identical reports. Failed mail is retried on the next run and
-fails the workflow visibly. SMTP acceptance is not proof of inbox delivery. A
+runs do not resend identical reports. Missing SMTP configuration produces an explicit warning, not a failed sync job.
+Configured SMTP delivery errors still fail visibly; retry manually after repair. SMTP acceptance is not proof of inbox delivery. A
 crash after sending but before saving the marker can cause a duplicate delivery.
 Without SMTP secrets, reports still exist but email is **not configured**.
 
