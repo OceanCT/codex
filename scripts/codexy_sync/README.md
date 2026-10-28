@@ -39,14 +39,18 @@ publishing unvalidated code or overwriting a concurrently advanced target.
   combined without discarding either module, then still require validation.
 - Other merge conflicts produce a report with paths, affected Codexy features,
   official release notes and a link to the Action. Codexy is not overwritten.
-- Missing required feature files, or updates touching the known unpublished
-  provider-selection symbols in its affected files, stop for review. Remove that temporary guard after
-  the work is committed, integrated and covered by regression tests.
+- Missing required feature files stop for review. Provider selection is part of
+  the published feature registry and behavioral regressions, including switching
+  providers and recovering the selection after a server restart.
 - Sharing a source file is not automatically a conflict. A clean merge must
   build the CLI and matching Code Mode Host, then pass the existing recycle-bin,
   empty-thread lifecycle, native-media, Agents stack, renderer and host protocol
   regressions. Failures block publication, including missing tools or build
   dependencies. Infrastructure failures are not called confirmed conflicts.
+- `.github/workflows/` remains fork-owned: upstream release/build automation is
+  not product behavior and is not imported by automatic updates. This also keeps
+  normal publishing within the built-in token's contents permission. Git push
+  rejection details are included in publication-failure reports.
 - Only an unchanged validated candidate can advance the target, using a normal
   fast-forward push. Concurrent target updates reject publication and require a
   fresh run. Validation happens within this workflow; it does not rely on another

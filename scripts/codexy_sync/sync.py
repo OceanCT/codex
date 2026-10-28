@@ -56,6 +56,23 @@ def changed(repo, before, after):
     return git(repo, 'diff', '--name-only', '--no-renames', before, after).stdout.splitlines()
 
 
+def preserve_fork_workflows(repo, tree, head):
+    """Keep fork-owned Actions definitions outside upstream product updates."""
+    with tempfile.TemporaryDirectory() as temp:
+        env = dict(os.environ, GIT_INDEX_FILE=str(Path(temp) / 'index'))
+        def index(*args, input=None):
+            return subprocess.run(['git', *args], cwd=repo, env=env, input=input,
+                                  text=True, capture_output=True, check=True).stdout.strip()
+        index('read-tree', tree)
+        paths = git(repo, 'ls-tree', '-r', '--name-only', tree, '--', '.github/workflows').stdout
+        for path in paths.splitlines():
+            index('update-index', '--force-remove', '--', path)
+        entries = git(repo, 'ls-tree', '-r', head, '--', '.github/workflows').stdout
+        if entries:
+            index('update-index', '--index-info', input=entries)
+        return index('write-tree')
+
+
 def resolve_module_additions(repo, tree, paths):
     """Resolve only independent bare Rust module declarations at an empty base hunk."""
     unresolved, resolved = [], []
@@ -184,8 +201,11 @@ def prepare(repo, tag, policy):
         raise RuntimeError(merged.stderr)
     report['merge_details'] = merged.stdout
     tree = merged.stdout.splitlines()[0]
+    tree = preserve_fork_workflows(repo, tree, head)
+    report['preserved_fork_workflows'] = [p for p in files if p.startswith('.github/workflows/')]
     if merged.returncode == 1:
         conflicts = merged.stdout.split('\n\n', 1)[0].splitlines()[1:]
+        conflicts = [p for p in conflicts if not p.startswith('.github/workflows/')]
         tree, conflicts, resolved = resolve_module_additions(repo, tree, conflicts)
         report['auto_resolved_module_additions'] = resolved
         if conflicts:
@@ -260,7 +280,9 @@ def publish(repo, report, branch):
     if remote != report['base_head']:
         raise ValueError('Target advanced during validation; rerun from the new baseline')
     # No force: a concurrent writer must never be overwritten.
-    git(repo, 'push', 'origin', f'{head}:refs/heads/{branch}')
+    result = git(repo, 'push', 'origin', f'{head}:refs/heads/{branch}', check=False)
+    if result.returncode:
+        raise ValueError(f'Git publication rejected: {result.stderr.strip()}')
     report['status'] = 'published'
 
 

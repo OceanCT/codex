@@ -70,22 +70,5 @@
         "codex-rs/tui/src/app/tests/model_provider_selection_tests.rs"
       ]
     }
-  },
-  "pending_local_features": [
-    "codex-rs/tui/src/app.rs",
-    "codex-rs/tui/src/app/event_dispatch.rs",
-    "codex-rs/tui/src/chatwidget/model_popups.rs",
-    "codex-rs/tui/src/chatwidget/session_model_selection.rs",
-    "codex-rs/tui/src/app_server_session/",
-    "codex-rs/app-server/src/request_processors/thread_processor.rs"
-  ],
-  "pending_local_tokens": [
-    "model_provider",
-    "model_catalog",
-    "reasoning_effort",
-    "model_picker",
-    "model_popups",
-    "session_model_selection",
-    "ThreadResumeParams"
-  ]
+  }
 }

@@ -102,6 +102,26 @@ class MergeTests(unittest.TestCase):
         self.assertEqual(self.git('rev-parse', 'HEAD'), before)
         self.assertEqual(self.git('status', '--porcelain'), '')
 
+    def test_upstream_workflows_do_not_replace_fork_automation(self):
+        (self.repo / '.github/workflows').mkdir(parents=True)
+        self.write('.github/workflows/build.yml', 'fork build\n')
+        self.write('.github/workflows/sync.yml', 'fork controller\n')
+        self.commit('fork workflows')
+        self.git('checkout', '-b', 'upstream-release', self.base)
+        (self.repo / '.github/workflows').mkdir(parents=True, exist_ok=True)
+        self.write('.github/workflows/build.yml', 'upstream build\n')
+        self.write('.github/workflows/release.yml', 'upstream release\n')
+        self.write('new.txt', 'product feature\n')
+        self.commit('upstream workflows and product')
+        self.git('tag', self.release['tag_name'])
+        self.git('checkout', 'fork')
+        report = self.prepare()
+        self.assertEqual(report['status'], 'ready')
+        self.assertEqual((self.repo / '.github/workflows/build.yml').read_text(), 'fork build\n')
+        self.assertEqual((self.repo / '.github/workflows/sync.yml').read_text(), 'fork controller\n')
+        self.assertFalse((self.repo / '.github/workflows/release.yml').exists())
+        self.assertEqual((self.repo / 'new.txt').read_text(), 'product feature\n')
+
     def test_clean_boundary_change_is_candidate_pending_behavioral_tests(self):
         self.upstream('feature.rs', 'different behavior\n')
         report = self.prepare()
