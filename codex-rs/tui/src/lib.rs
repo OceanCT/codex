@@ -132,6 +132,7 @@ mod markdown_copy;
 mod permission_discovery;
 mod pets;
 mod rich_media;
+mod security_setup;
 mod worktree_browser;
 pub use custom_terminal::Terminal;
 mod assistant_directives;
