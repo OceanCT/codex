@@ -18,10 +18,12 @@ conflict reports and attempts notification, but never builds or publishes.
   note headings describe the change; a `fix` label does not bypass validation.
 - Three-way merging uses the pinned previous release as the base, avoiding false
   conflicts caused by backports on upstream release branches.
-- Real merge conflicts produce a report with paths, affected Codexy features,
+- Independent bare Rust `mod` insertions at the same empty base hunk are
+  combined without discarding either module, then still require validation.
+- Other merge conflicts produce a report with paths, affected Codexy features,
   official release notes and a link to the Action. Codexy is not overwritten.
 - Missing required feature files, or updates touching the known unpublished
-  provider-selection work, stop for review. Remove that temporary guard after
+  provider-selection symbols in its affected files, stop for review. Remove that temporary guard after
   the work is committed, integrated and covered by regression tests.
 - Sharing a source file is not automatically a conflict. A clean merge must
   build the CLI and matching Code Mode Host, then pass the existing recycle-bin,

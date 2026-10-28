@@ -5,6 +5,7 @@ import os
 from pathlib import Path
 import re
 import subprocess
+import tempfile
 
 STATE = '.codexy-upstream.json'
 TAG = re.compile(r'rust-v(\d+)\.(\d+)\.(\d+)$')
@@ -52,6 +53,43 @@ def next_release(current):
 
 def changed(repo, before, after):
     return git(repo, 'diff', '--name-only', '--no-renames', before, after).stdout.splitlines()
+
+
+def resolve_module_additions(repo, tree, paths):
+    """Resolve only independent bare Rust module declarations at an empty base hunk."""
+    unresolved, resolved = [], []
+    pattern = re.compile(r'^<<<<<<<[^\n]*\n(.*?)^\|\|\|\|\|\|\|[^\n]*\n(.*?)^=======\n(.*?)^>>>>>>>[^\n]*\n', re.MULTILINE | re.DOTALL)
+    with tempfile.TemporaryDirectory() as temp:
+        env = dict(os.environ, GIT_INDEX_FILE=str(Path(temp) / 'index'))
+        def index(*args, input=None):
+            return subprocess.run(['git', *args], cwd=repo, env=env, input=input, text=True, capture_output=True, check=True).stdout.strip()
+        index('read-tree', tree)
+        for path in paths:
+            if not path.endswith('.rs'):
+                unresolved.append(path)
+                continue
+            result = git(repo, 'show', f'{tree}:{path}', check=False)
+            text = result.stdout
+            matches = list(pattern.finditer(text)) if path.endswith('.rs') and result.returncode == 0 else []
+            safe = bool(matches)
+            for match in matches:
+                ours, base, theirs = match.groups()
+                lines = (ours + theirs).splitlines()
+                before = text[:match.start()].rstrip().splitlines()
+                safe = safe and not base.strip() and bool(ours.strip()) and bool(theirs.strip())
+                safe = safe and all(re.fullmatch(r'mod [a-zA-Z_][a-zA-Z_0-9]*;', line) for line in lines)
+                safe = safe and len(lines) == len(set(lines)) and not (before and before[-1].lstrip().startswith('#['))
+            if not safe:
+                unresolved.append(path)
+                continue
+            text = pattern.sub(lambda m: ''.join(sorted((m.group(1) + m.group(3)).splitlines(keepends=True))), text)
+            if any(marker in text for marker in ('<<<<<<<', '=======', '>>>>>>>')):
+                unresolved.append(path)
+                continue
+            blob = index('hash-object', '-w', '--stdin', input=text)
+            index('update-index', '--add', '--cacheinfo', '100644', blob, path)
+            resolved.append(path)
+        return index('write-tree'), unresolved, resolved
 
 
 def stamp_version(repo, tag):
@@ -110,19 +148,31 @@ def prepare(repo, tag, policy):
             report['features_touched'][name] = touched
     # Stable release branches contain backports: use the explicitly pinned previous
     # release tree, not an older graph merge-base that invents backport conflicts.
-    merged = git(repo, 'merge-tree', '--write-tree', '--name-only', f'--merge-base={base}', head, upstream, check=False)
+    merged = git(repo, '-c', 'merge.conflictStyle=diff3', 'merge-tree', '--write-tree', '--name-only', f'--merge-base={base}', head, upstream, check=False)
     if merged.returncode not in (0, 1):
         raise RuntimeError(merged.stderr)
     report['merge_details'] = merged.stdout
-    if merged.returncode == 1:
-        report['status'] = 'conflict'
-        report['conflicts'] = merged.stdout.split('\n\n', 1)[0].splitlines()[1:]
-        report['reasons'].append('Git 三方合并存在冲突；未覆盖 Codexy 的改动。具体冲突见下表及附件。')
-        return report
     tree = merged.stdout.splitlines()[0]
+    if merged.returncode == 1:
+        conflicts = merged.stdout.split('\n\n', 1)[0].splitlines()[1:]
+        tree, conflicts, resolved = resolve_module_additions(repo, tree, conflicts)
+        report['auto_resolved_module_additions'] = resolved
+        if conflicts:
+            report['status'] = 'conflict'
+            report['conflicts'] = conflicts
+            report['reasons'].append('Git 三方合并存在冲突；未覆盖 Codexy 的改动。具体冲突见下表及附件。')
+            report['conflict_excerpts'] = {}
+            for path in [p for p in conflicts if p.endswith(('.rs', '.toml', '.md', '.ts', '.py'))][:8]:
+                blob = git(repo, 'show', f'{tree}:{path}', check=False).stdout
+                pos = blob.find('<<<<<<<')
+                if pos >= 0:
+                    report['conflict_excerpts'][path] = blob[max(0, pos-150):pos+1800]
+            return report
     # These are known local WIP features not yet in the published target branch.
     for prefix in policy.get('pending_local_features', []):
-        if any(p.startswith(prefix) for p in files):
+        diff = git(repo, 'diff', '--unified=0', base, upstream, '--', prefix).stdout
+        changed_lines = '\n'.join(line for line in diff.splitlines() if line[:1] in ('+', '-') and line[:3] not in ('+++', '---'))
+        if any(token in changed_lines for token in policy.get('pending_local_tokens', [])):
             report['reasons'].append(f'尚未提交的本地模型供应商功能依赖 {prefix}，兼容性需确认。')
     for name, feature in policy['features'].items():
         for path in feature.get('required_files', []):
@@ -158,6 +208,8 @@ def markdown(report):
         lines += ['', f'### {name}', *[f'- `{p}`' for p in paths]]
     if report.get('conflicts'):
         lines += ['', '### 合并冲突', *[f'- `{p}`' for p in report['conflicts']]]
+    for path, excerpt in report.get('conflict_excerpts', {}).items():
+        lines += ['', f'### 冲突片段：{path}', '````text', excerpt, '````']
     lines += ['', '### 官方发布说明', report.get('release_notes', '')]
     return '\n'.join(lines) + '\n'
 

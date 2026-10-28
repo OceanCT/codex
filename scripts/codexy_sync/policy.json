@@ -3,17 +3,75 @@
   "recipient": "oceanct17@gmail.com",
   "features": {
     "回收站与空会话持久化": {
-      "paths": ["codex-rs/app-server/src/request_processors/thread_", "codex-rs/app-server/src/message_processor.rs", "codex-rs/app-server/src/request_processors.rs", "codex-rs/app-server-protocol/src/protocol/", "codex-rs/core/src/codex_thread.rs", "codex-rs/tui/src/app/agents_", "codex-rs/tui/src/app/agent_center/", "codex-rs/tui/src/app_server_session", "codex-rs/tui/src/app_event.rs", "codex-rs/tui/src/keymap_setup/actions.rs"],
-      "required_files": ["codex-rs/app-server/src/request_processors/thread_trash.rs", "codex-rs/app-server/tests/suite/v2/thread_empty_lifecycle.rs", "codex-rs/app-server/tests/suite/v2/thread_resume_empty.rs", "codex-rs/app-server/tests/suite/v2/thread_trash.rs", "codex-rs/tui/src/app/agents_recycle_bin.rs"]
+      "paths": [
+        "codex-rs/app-server/src/request_processors/thread_",
+        "codex-rs/app-server/src/message_processor.rs",
+        "codex-rs/app-server/src/request_processors.rs",
+        "codex-rs/app-server-protocol/src/protocol/",
+        "codex-rs/core/src/codex_thread.rs",
+        "codex-rs/tui/src/app/agents_",
+        "codex-rs/tui/src/app/agent_center/",
+        "codex-rs/tui/src/app_server_session",
+        "codex-rs/tui/src/app_event.rs",
+        "codex-rs/tui/src/keymap_setup/actions.rs"
+      ],
+      "required_files": [
+        "codex-rs/app-server/src/request_processors/thread_trash.rs",
+        "codex-rs/app-server/tests/suite/v2/thread_empty_lifecycle.rs",
+        "codex-rs/app-server/tests/suite/v2/thread_resume_empty.rs",
+        "codex-rs/app-server/tests/suite/v2/thread_trash.rs",
+        "codex-rs/tui/src/app/agents_recycle_bin.rs"
+      ]
     },
     "iTerm2 原生数学和图片": {
-      "paths": ["codex-rs/tui/src/rich_media", "codex-rs/tui/src/markdown_render", "codex-rs/tui/src/custom_terminal.rs", "codex-rs/tui/src/insert_history.rs", "codex-rs/tui/src/history_cell/", "scripts/render_codex_y_latex.py"],
-      "required_files": ["codex-rs/tui/src/rich_media.rs", "codex-rs/tui/src/rich_media_tests.rs", "scripts/render_codex_y_latex.py", "scripts/test_render_codex_y_latex.py"]
+      "paths": [
+        "codex-rs/tui/src/rich_media",
+        "codex-rs/tui/src/markdown_render",
+        "codex-rs/tui/src/custom_terminal.rs",
+        "codex-rs/tui/src/insert_history.rs",
+        "codex-rs/tui/src/history_cell/",
+        "scripts/render_codex_y_latex.py"
+      ],
+      "required_files": [
+        "codex-rs/tui/src/rich_media.rs",
+        "codex-rs/tui/src/rich_media_tests.rs",
+        "scripts/render_codex_y_latex.py",
+        "scripts/test_render_codex_y_latex.py"
+      ]
     },
     "独立安装、启动和栈溢出修复": {
-      "paths": ["codex-rs/arg0/", "codex-rs/tui/src/lib.rs", "codex-rs/utils/pty/src/child_command.rs", "scripts/install_codex_y.py", "scripts/smoke_codex_y_host.py", "AGENTS.md", ".cargo/config.toml", "codex-rs/.config/nextest.toml"],
-      "required_files": ["scripts/install_codex_y.py", "scripts/smoke_codex_y_host.py", "codex-rs/tui/tests/suite/agents_stack.rs"]
+      "paths": [
+        "codex-rs/arg0/",
+        "codex-rs/tui/src/lib.rs",
+        "codex-rs/utils/pty/src/child_command.rs",
+        "scripts/install_codex_y.py",
+        "scripts/smoke_codex_y_host.py",
+        "AGENTS.md",
+        ".cargo/config.toml",
+        "codex-rs/.config/nextest.toml"
+      ],
+      "required_files": [
+        "scripts/install_codex_y.py",
+        "scripts/smoke_codex_y_host.py",
+        "codex-rs/tui/tests/suite/agents_stack.rs"
+      ]
     }
   },
-  "pending_local_features": ["codex-rs/tui/src/app.rs", "codex-rs/tui/src/app/event_dispatch.rs", "codex-rs/tui/src/chatwidget/model_popups.rs", "codex-rs/tui/src/chatwidget/session_model_selection.rs", "codex-rs/tui/src/app_server_session/"]
+  "pending_local_features": [
+    "codex-rs/tui/src/app.rs",
+    "codex-rs/tui/src/app/event_dispatch.rs",
+    "codex-rs/tui/src/chatwidget/model_popups.rs",
+    "codex-rs/tui/src/chatwidget/session_model_selection.rs",
+    "codex-rs/tui/src/app_server_session/",
+    "codex-rs/app-server/src/request_processors/thread_processor.rs"
+  ],
+  "pending_local_tokens": [
+    "model_provider",
+    "model_catalog",
+    "reasoning_effort",
+    "model_picker",
+    "model_popups",
+    "session_model_selection",
+    "ThreadResumeParams"
+  ]
 }

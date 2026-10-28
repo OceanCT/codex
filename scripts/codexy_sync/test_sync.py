@@ -70,6 +70,22 @@ class MergeTests(unittest.TestCase):
         self.assertEqual(json.loads((self.repo / sync.STATE).read_text())['upstream_tag'], 'rust-v1.1.0')
         self.assertEqual(len(self.git('rev-list', '--parents', '-n', '1', 'HEAD').split()), 3)
 
+    def test_independent_module_additions_are_combined(self):
+        self.git('checkout', 'main')
+        self.write('lib.rs', 'mod first;\nmod last;\n')
+        self.commit('base modules')
+        self.base = self.git('rev-parse', 'HEAD')
+        self.git('checkout', 'fork')
+        self.git('merge', 'main', '--no-edit')
+        self.write(sync.STATE, json.dumps({'upstream_tag': 'rust-v1.0.0', 'upstream_sha': self.base}))
+        self.write('lib.rs', 'mod first;\nmod rich_media;\nmod last;\n')
+        self.commit('fork module')
+        self.upstream('lib.rs', 'mod first;\nmod security_setup;\nmod last;\n')
+        report = self.prepare()
+        self.assertEqual(report['status'], 'ready')
+        self.assertEqual(report['auto_resolved_module_additions'], ['lib.rs'])
+        self.assertIn('mod rich_media;\nmod security_setup;', (self.repo / 'lib.rs').read_text())
+
     def test_actual_conflict_leaves_fork_untouched(self):
         self.write('shared.txt', 'fork behavior\n')
         self.commit('custom behavior')
@@ -105,6 +121,7 @@ class MergeTests(unittest.TestCase):
 
     def test_pending_local_feature_is_protected(self):
         self.policy['pending_local_features'] = ['shared.txt']
+        self.policy['pending_local_tokens'] = ['provider']
         self.upstream('shared.txt', 'new provider behavior')
         self.assertEqual(self.prepare()['status'], 'review_required')
 
