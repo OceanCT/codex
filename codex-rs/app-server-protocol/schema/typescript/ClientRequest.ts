@@ -70,6 +70,7 @@ import type { ThreadApproveGuardianDeniedActionParams } from "./v2/ThreadApprove
 import type { ThreadArchiveParams } from "./v2/ThreadArchiveParams";
 import type { ThreadAttachmentAddParams } from "./v2/ThreadAttachmentAddParams";
 import type { ThreadAttachmentListParams } from "./v2/ThreadAttachmentListParams";
+import type { ThreadAttachmentOwnerListParams } from "./v2/ThreadAttachmentOwnerListParams";
 import type { ThreadAttachmentRemoveParams } from "./v2/ThreadAttachmentRemoveParams";
 import type { ThreadCompactStartParams } from "./v2/ThreadCompactStartParams";
 import type { ThreadDeleteParams } from "./v2/ThreadDeleteParams";

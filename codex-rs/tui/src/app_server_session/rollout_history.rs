@@ -227,6 +227,7 @@ impl AppServerSession {
         permission_overrides: crate::resume_permissions::ResumePermissions,
         provider_override: Option<(String, std::collections::HashMap<String, serde_json::Value>)>,
     ) -> Result<AppServerStartedThread> {
+        self.thread_tool_transport().validate_config(&config)?;
         let session_config = if matches!(
             model_settings,
             ResumeModelSettings::RestoreFromThread | ResumeModelSettings::PreserveExistingThread
