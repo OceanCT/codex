@@ -38,13 +38,14 @@ async fn config(home: &TempDir, backend: &MockServer) -> Result<()> {
             backend.uri()
         ),
     )?;
+    // Routing uses a plain HTTP fixture; restricted policies require HTTPS/WSS.
     Mock::given(method("GET")).and(path("/backend-api/wham/config/bundle"))
         .respond_with(|request: &wiremock::Request| {
             let account_id = request.headers.get("chatgpt-account-id").expect("workspace header")
                 .to_str().expect("workspace header text");
             ResponseTemplate::new(200).set_body_json(json!({"requirements_toml": {"enterprise_managed": [{
                 "id": "workspace-policy", "name": "Workspace policy",
-                "contents": format!("[application.network.domains]\n'{account_id}.example' = 'allow'"),
+                "contents": format!("[application.network]\nenabled = false\n[application.network.domains]\n'{account_id}.example' = 'allow'"),
             }]}}))
         }).mount(backend).await;
     Ok(())
@@ -116,7 +117,8 @@ async fn saved_workspace_is_discovered_once_and_not_the_default_account(
                     .set_delay(Duration::from_secs(bundle_delay_secs)),
             )
             .with_priority(1)
-            .expect(2)
+            // Startup and account hydration each retry this delayed response via proxy fallback.
+            .expect(4)
             .mount(&backend)
             .await;
     }
@@ -277,8 +279,8 @@ async fn login_and_workspace_switch_notify_after_routing_is_ready_then_logout_cl
         assert_eq!(
             requirements["requirements"]["application"],
             json!({"network": {
-                "enabled": true, "domains": {format!("{account}.example"): "allow"}
-            }})
+                "enabled": false, "domains": {format!("{account}.example"): "allow"}
+            }, "storage": null})
         );
     }
     let request = server.send_logout_account_request().await?;
@@ -393,19 +395,32 @@ async fn api_only_login_does_not_discover_chatgpt_routing() -> Result<()> {
     Ok(())
 }
 
+#[test_case(
+    json!({"requirements_toml": {"enterprise_managed": [{
+        "id": "invalid", "name": "Invalid requirements", "contents": "application = 'sk-test-private-value'",
+    }]}}),
+    "failed to load workspace requirements: cloud config: invalid bundle";
+    "invalid_requirements"
+)]
+#[test_case(
+    json!({"config_toml": {"enterprise_managed": [{
+        "id": "sk-test-private-id", "name": "sk-test-private-name", "contents": "model = 123",
+    }]}}),
+    "failed to load workspace requirements: invalid non-file configuration at line 1, column 9";
+    "invalid_non_file_config"
+)]
 #[tokio::test]
-async fn failed_workspace_requirements_do_not_fall_back_to_startup_config() -> Result<()> {
+async fn failed_workspace_requirements_do_not_fall_back_to_startup_config(
+    bundle: Value,
+    expected_message: &str,
+) -> Result<()> {
     let backend = MockServer::start().await;
     let home = TempDir::new()?;
     config(&home, &backend).await?;
     let mut server = start(&home).await?;
     backend.reset().await;
     Mock::given(path("/backend-api/wham/config/bundle"))
-        .respond_with(ResponseTemplate::new(200).set_body_json(
-            json!({"requirements_toml": {"enterprise_managed": [{
-                "id": "invalid", "name": "Invalid requirements", "contents": "application = true",
-            }]}}),
-        ))
+        .respond_with(ResponseTemplate::new(200).set_body_json(bundle))
         .mount(&backend)
         .await;
     Mock::given(path("/backend-api/wham/accounts/check"))
@@ -419,7 +434,10 @@ async fn failed_workspace_requirements_do_not_fall_back_to_startup_config() -> R
         server.read_stream_until_notification_message("account/login/completed"),
     )
     .await??;
-    assert_eq!(notification.params.unwrap()["success"], false);
+    assert_eq!(
+        notification.params.expect("account/login/completed params")["success"],
+        false
+    );
     let request = server
         .send_get_account_request(GetAccountParams {
             refresh_token: false,
@@ -430,7 +448,8 @@ async fn failed_workspace_requirements_do_not_fall_back_to_startup_config() -> R
         server.read_stream_until_error_message(RequestId::Integer(request)),
     )
     .await??;
-    assert_eq!(error.error.message, "failed to load workspace requirements");
+    assert_eq!(error.error.code, -32603);
+    assert_eq!(error.error.message, expected_message);
     backend.verify().await;
     Ok(())
 }

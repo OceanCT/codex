@@ -140,6 +140,7 @@ async fn webrtc_sideband_honors_configured_system_proxy() -> Result<()> {
             codex_responses_as_items: false,
             codex_response_item_prefix: None,
             codex_response_handoff_mode: CodexResponseHandoffMode::Thinking,
+            backend_reasoning_status: false,
             codex_response_handoff_channel_prefixes: None,
             model: None,
             output_modality: RealtimeOutputModality::Audio,
@@ -149,6 +150,7 @@ async fn webrtc_sideband_honors_configured_system_proxy() -> Result<()> {
             realtime_end_instructions: None,
             prompt: None,
             realtime_session_id: None,
+            voice_session_id: None,
             transport: Some(ConversationStartTransport::Webrtc {
                 sdp: "v=offer\r\n".to_string(),
             }),

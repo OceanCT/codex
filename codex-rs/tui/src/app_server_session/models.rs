@@ -25,6 +25,7 @@ impl AppServerSession {
 
     pub(crate) fn fetch_models(&self, request_id: Uuid, app_event_tx: AppEventSender) {
         let request_handle = self.request_handle();
+        let profiles = self.picker_profiles.clone();
         tokio::spawn(async move {
             let result = request_handle
                 .request_typed::<ModelListResponse>(ClientRequest::ModelList {
@@ -37,11 +38,13 @@ impl AppServerSession {
                 })
                 .await
                 .map(|response| {
-                    response
+                    let mut models = response
                         .data
                         .into_iter()
                         .map(model_preset_from_api_model)
-                        .collect()
+                        .collect();
+                    crate::model_picker_profiles::extend(&mut models, &profiles);
+                    models
                 })
                 .map_err(|err| err.to_string());
             app_event_tx.send(AppEvent::ModelsLoaded { request_id, result });

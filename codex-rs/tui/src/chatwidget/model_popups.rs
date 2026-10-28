@@ -145,7 +145,6 @@ impl ChatWidget {
                     name: preset.display_name.clone(),
                     description,
                     is_current: model.as_str() == current_model,
-                    is_default: preset.is_default,
                     secondary_action: if requires_advanced_selection {
                         None
                     } else {
@@ -267,7 +266,6 @@ impl ChatWidget {
                 name: preset.display_name.clone(),
                 description,
                 is_current,
-                is_default: preset.is_default,
                 secondary_action: direct_effort.and_then(|effort| {
                     self.session_model_selection_action(preset.model.clone(), Some(effort))
                 }),
@@ -299,10 +297,21 @@ impl ChatWidget {
         let warning = effort_for_action
             .as_ref()
             .and_then(|effort| self.ultra_reasoning_concurrency_warning(effort));
+        let provider_selection = crate::model_picker_profiles::needs_provider_selection(
+            self.config.codex_home.as_path(),
+            self.current_model(),
+            &model_for_action,
+        );
         let thread_id = self.thread_id();
         let sparkle_thread = self.sparkle_thread_for_picker_action(&model_for_action);
         vec![Box::new(move |tx| {
-            if model_for_action == LUNA_RESERVE_MODEL {
+            if provider_selection {
+                tx.send(AppEvent::SelectSessionModel {
+                    model: model_for_action.clone(),
+                    effort: effort_for_action.clone(),
+                    service_tier: None,
+                });
+            } else if model_for_action == LUNA_RESERVE_MODEL {
                 // Reserve is temporary: update the active task without persisting a model default.
                 if let Some(thread_id) = thread_id {
                     tx.send(AppEvent::UpdateLunaReserveReasoning {
@@ -377,7 +386,7 @@ impl ChatWidget {
             }
             None => "the selected reasoning".to_string(),
         };
-        let plan_only_description = format!("Always use {reasoning_phrase} in Plan mode.");
+        let plan_only_description = format!("Always use {reasoning_phrase} in Plan mode");
         let plan_reasoning_source = if let Some(plan_override) =
             self.config.plan_mode_reasoning_effort.as_ref()
         {
@@ -402,7 +411,7 @@ impl ChatWidget {
             "built-in Plan default".to_string()
         };
         let all_modes_description = format!(
-            "Set the global default reasoning level and the Plan mode override. This replaces the current {plan_reasoning_source}."
+            "Set the global default reasoning level and Plan mode override, replacing the current {plan_reasoning_source}"
         );
         let subtitle = format!("Choose where to apply {reasoning_phrase}.");
         let warning = effort
@@ -498,7 +507,7 @@ impl ChatWidget {
         };
         let warning_text = warn_effort.as_ref().map(|effort| {
             let effort_label = Self::reasoning_effort_label(effort);
-            format!("⚠ {effort_label} reasoning effort can quickly consume Plus plan rate limits.")
+            format!("⚠ {effort_label} reasoning effort can quickly consume Plus plan rate limits")
         });
         let warn_for_model = preset.model.starts_with("gpt-5.1-codex")
             || preset.model.starts_with("gpt-5.1-codex-max")

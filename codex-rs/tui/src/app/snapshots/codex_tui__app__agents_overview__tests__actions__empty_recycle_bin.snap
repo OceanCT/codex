@@ -1,0 +1,10 @@
+---
+source: tui/src/app/agents_overview_actions_tests.rs
+expression: "render_bottom_popup(&app.chat_widget, 72)"
+---
+  Bin · 30 days · Enter to restore
+
+
+no matches
+
+  enter select · esc back

@@ -40,7 +40,7 @@ use core_test_support::responses::mount_sse_sequence;
 use core_test_support::responses::start_mock_server;
 use core_test_support::skip_if_no_network;
 use core_test_support::stdio_server_bin;
-use core_test_support::test_codex::local_selections;
+use core_test_support::test_codex::local_requests;
 use core_test_support::test_codex::test_codex;
 use core_test_support::test_codex::turn_permission_fields;
 use core_test_support::wait_for_event;
@@ -154,7 +154,7 @@ async fn thread_creator_survives_resume_and_forks_use_current_auth() -> Result<(
 
         let fork = resumed
             .thread_manager
-            .fork_thread(
+            .fork_legacy_thread(
                 codex_core::ForkSnapshot::Interrupted,
                 StartThreadOptions::new(resumed.config.clone()),
                 rollout_path,
@@ -358,6 +358,7 @@ async fn resume_restores_dynamic_tools_from_rollout_with_sqlite_enabled() -> Res
         .thread_manager
         .start_thread(StartThreadOptions {
             dynamic_tools: vec![dynamic_tool],
+            history_mode: Some(codex_protocol::protocol::ThreadHistoryMode::Legacy),
             ..StartThreadOptions::new(base_test.config.clone())
         })
         .await?;
@@ -451,7 +452,10 @@ async fn resume_restores_legacy_dynamic_tools_from_rollout_with_sqlite_enabled()
     let base_test = builder.build(&server).await?;
     let started = base_test
         .thread_manager
-        .start_thread(StartThreadOptions::new(base_test.config.clone()))
+        .start_thread(StartThreadOptions {
+            history_mode: Some(codex_protocol::protocol::ThreadHistoryMode::Legacy),
+            ..StartThreadOptions::new(base_test.config.clone())
+        })
         .await?;
     let rollout_path = started
         .session_configured
@@ -553,6 +557,7 @@ async fn backfill_scans_existing_rollouts() -> Result<()> {
             fs::create_dir_all(parent).expect("should create rollout directory");
             let session_meta_line = SessionMetaLine {
                 meta: SessionMeta {
+                    attached_thread: false,
                     creator_user_id: None,
                     creator_account_id: None,
                     session_id: thread_id.into(),
@@ -588,7 +593,7 @@ async fn backfill_scans_existing_rollouts() -> Result<()> {
                 RolloutLine {
                     timestamp: "2026-01-27T12:00:00Z".to_string(),
                     ordinal: None,
-                    item: RolloutItem::SessionMeta(session_meta_line),
+                    item: RolloutItem::SessionMeta(Box::new(session_meta_line)),
                 },
                 RolloutLine {
                     timestamp: "2026-01-27T12:00:01Z".to_string(),
@@ -878,7 +883,9 @@ async fn mcp_call_marks_thread_memory_mode_polluted_when_configured() -> Result<
                 environment_id: "local".to_string(),
                 enabled: true,
                 required: false,
+                startup_readiness: Default::default(),
                 supports_parallel_tool_calls: false,
+                tool_input_schema_max_bytes: None,
                 omit_tools_from: None,
                 disabled_reason: None,
                 startup_timeout_sec: Some(Duration::from_secs(10)),
@@ -912,7 +919,7 @@ async fn mcp_call_marks_thread_memory_mode_polluted_when_configured() -> Result<
                 text_elements: Vec::new(),
             }])
             .with_thread_settings(ThreadSettingsOverrides {
-                environments: Some(local_selections(cwd)),
+                environments: Some(local_requests(cwd)),
                 approval_policy: Some(AskForApproval::Never),
                 sandbox_policy: Some(sandbox_policy),
                 permission_profile,
@@ -987,7 +994,8 @@ async fn tool_call_logs_include_thread_id() -> Result<()> {
 
     test.submit_turn("run a shell command").await?;
 
-    let log_db_layer = codex_state::log_db::start(db.clone());
+    let log_db_layer =
+        codex_state::log_db::start(db.clone(), Arc::new(codex_feedback::CodexFeedback::new()));
     let subscriber = tracing_subscriber::registry().with(log_db_layer.clone());
     let dispatch = tracing::Dispatch::new(subscriber);
     tracing::dispatcher::with_default(&dispatch, || {
@@ -996,6 +1004,10 @@ async fn tool_call_logs_include_thread_id() -> Result<()> {
         tracing::info!("ToolCall: exec_command {{\"cmd\":\"echo hello\"}}");
     });
     log_db_layer.flush().await;
+
+    let logs_path = test.config.sqlite.home().join("logs_2.sqlite");
+    assert_eq!(db.sqlite().logs_db_path(), logs_path);
+    assert!(logs_path.is_file());
 
     let mut found = None;
     for _ in 0..80 {

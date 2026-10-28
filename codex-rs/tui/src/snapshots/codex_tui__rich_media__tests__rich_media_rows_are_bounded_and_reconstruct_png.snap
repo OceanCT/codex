@@ -1,0 +1,8 @@
+---
+source: tui/src/rich_media_tests.rs
+expression: "format!(\"image rows: {}\\ncolumns: {}\\nrow height: 1\\nprotocol: OSC 1337\\n\",\ncache.rows.len(),\ncrate::width::display_width(markers.lines().next().unwrap()),)"
+---
+image rows: 3
+columns: 10
+row height: 1
+protocol: OSC 1337
