@@ -49,8 +49,10 @@ def notify(report, repository):
     else:
         raise RuntimeError('Issue scan limit exceeded; refusing duplicate notifications')
     marker = f'<!-- codexy-email-sent:{fingerprint} -->'
-    sent = issue is not None and marker in issue['body']
-    run_url = f"https://github.com/{repository}/actions/runs/{os.environ.get('GITHUB_RUN_ID', '')}"
+    sent = issue is not None and marker in (issue.get('body') or '')
+    run_id = os.environ.get('GITHUB_RUN_ID')
+    run_url = (f'https://github.com/{repository}/actions/runs/{run_id}' if run_id else
+               f'https://github.com/{repository}/actions/workflows/codexy-upstream.yml')
     content = body[:55000] + f'\n\n运行日志：{run_url}\n完整文件列表及合并详情见 workflow artifact。\n'
     if sent:
         print('Conflict already reported and emailed; no duplicate mail.')
