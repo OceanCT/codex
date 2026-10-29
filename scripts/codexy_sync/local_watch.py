@@ -4,6 +4,10 @@ import base64
 from contextlib import closing
 from datetime import datetime, timezone
 import fcntl
+import io
+import traceback
+from contextlib import redirect_stdout, redirect_stderr
+import execution_history as history
 import json
 import os
 from pathlib import Path
@@ -89,19 +93,36 @@ def main():
     os.environ.pop('REVIEWED_CANDIDATE', None)
     os.environ.pop('REQUESTED_RELEASE_TAG', None)
     now = datetime.now(timezone.utc).isoformat()
-    try:
-        result = check_once(args.state_dir, dispatch=args.dispatch)
-    except Exception as error:
-        result = {'status': 'error', 'error_type': type(error).__name__}
-        health = args.state_dir / 'last-check.json'
-        health.write_text(json.dumps({'checked_at': now, **result}, indent=2) + '\n')
-        print(json.dumps({'checked_at': now, **result}), flush=True)
-        raise
+    execution_id, result, failed = record_check(args.state_dir, dispatch=args.dispatch)
     health = args.state_dir / 'last-check.json'
     temp = health.with_suffix('.tmp')
-    temp.write_text(json.dumps({'checked_at': now, **result}, indent=2) + '\n')
+    temp.write_text(json.dumps({'checked_at': now, 'execution_id': execution_id, **result}, indent=2) + '\n')
     temp.replace(health)
-    print(json.dumps({'checked_at': now, **result}), flush=True)
+    print(json.dumps({'checked_at': now, 'execution_id': execution_id, **result}), flush=True)
+    if failed:
+        raise SystemExit(1)
+
+
+def record_check(state_dir, *, dispatch=False):
+    task = 'release-check'
+    path = state_dir / 'releases.sqlite3'
+    if path.exists():
+        with closing(sqlite3.connect(path)) as db:
+            pending = db.execute("SELECT tag FROM releases WHERE status!='completed' ORDER BY created_at LIMIT 1").fetchone()
+            if pending:
+                task = 'release:' + pending[0]
+    execution_id = history.start(state_dir, task)
+    stdout, stderr = io.StringIO(), io.StringIO()
+    failed = False
+    with redirect_stdout(stdout), redirect_stderr(stderr):
+        try:
+            result = check_once(state_dir, dispatch=dispatch)
+        except Exception as error:
+            failed = True
+            result = {'status': 'error', 'error_type': type(error).__name__}
+            traceback.print_exc()
+    history.finish(state_dir, execution_id, result, stdout.getvalue(), stderr.getvalue())
+    return execution_id, result, failed
 
 
 if __name__ == '__main__':

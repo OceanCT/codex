@@ -113,3 +113,29 @@ push. JSON and Markdown reports contain the full evidence.
 
 GitHub source updates do not install binaries on the user's Mac or restart a live
 Codexy daemon. Local installation remains the explicit workflow in `CODEX-Y.md`.
+
+## Daemon CLI and compressed execution history
+
+The installer also installs `~/.local/bin/codexy-daemon`:
+
+- `codexy-daemon status`: service state, last successful discovery, next due time,
+  pending updates and each task's latest execution.
+- `codexy-daemon status --watch`: refresh the local view every two seconds; Ctrl-C
+  exits the viewer without stopping the service or triggering GitHub calls.
+- `codexy-daemon tasks`: latest execution per task. `release-check` is the
+  discovery task; `release:rust-vX.Y.Z` identifies a release update.
+- `codexy-daemon history --limit 30`: execution index; optionally filter with
+  `--task release-check` or `--task release:rust-vX.Y.Z`.
+- `codexy-daemon show 12`: decompress and inspect execution 12, including result,
+  captured output and exception details.
+- `codexy-daemon run`: check now, still respecting the daily gate and existing
+  unfinished task. `start`/`stop` load/unload this launchd service only.
+
+`state/history.sqlite3` stores the searchable index and gzip-compressed JSON
+payloads atomically. Start time, finish time, status, task and PID stay queryable
+without decompressing history. No history is automatically deleted. Previously
+available last-check and log files are imported losslessly as `legacy` records;
+old records overwritten before this feature existed cannot be reconstructed.
+The daemon's normal output is stored in the compressed history rather than an
+unbounded plain-text stdout log. Startup failures before history initialization
+can still appear in `logs/stderr.log`.

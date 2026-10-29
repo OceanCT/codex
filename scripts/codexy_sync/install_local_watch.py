@@ -3,6 +3,8 @@ import os
 from pathlib import Path
 import plistlib
 import shutil
+import shlex
+import execution_history as history
 import subprocess
 import sys
 
@@ -12,6 +14,9 @@ def main():
     home = Path.home()
     root = home / '.local/share/codexy-upstream'
     controller = root / 'controller'
+    label = 'com.oceanct.codexy-upstream'
+    domain = f'gui/{os.getuid()}'
+    subprocess.run(['launchctl', 'bootout', f'{domain}/{label}'], capture_output=True)
     for relative in ('scripts/codexy_sync', '.github/workflows'):
         dest = controller / relative
         dest.mkdir(parents=True, exist_ok=True)
@@ -23,7 +28,11 @@ def main():
             shutil.copy2(source / relative / 'codexy-upstream.yml', dest / 'codexy-upstream.yml')
     (root / 'state').mkdir(mode=0o700, exist_ok=True)
     (root / 'logs').mkdir(mode=0o700, exist_ok=True)
-    label = 'com.oceanct.codexy-upstream'
+    history.import_legacy(root / 'state', root / 'logs')
+    launcher = home / '.local/bin/codexy-daemon'
+    launcher.parent.mkdir(parents=True, exist_ok=True)
+    launcher.write_text('#!/bin/sh\nexec ' + shlex.quote(sys.executable) + ' ' + shlex.quote(str(controller / 'scripts/codexy_sync/daemon_cli.py')) + ' "$@"\n')
+    launcher.chmod(0o755)
     plist = home / 'Library/LaunchAgents' / (label + '.plist')
     plist.parent.mkdir(parents=True, exist_ok=True)
     config = {
@@ -37,12 +46,10 @@ def main():
         'ProcessType': 'Background',
         'Nice': 10,
         'EnvironmentVariables': {'PATH': f'{home}/.local/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin', 'LANG': 'en_US.UTF-8'},
-        'StandardOutPath': str(root / 'logs/stdout.log'),
+        'StandardOutPath': '/dev/null',
         'StandardErrorPath': str(root / 'logs/stderr.log'),
     }
     plist.write_bytes(plistlib.dumps(config))
-    domain = f'gui/{os.getuid()}'
-    subprocess.run(['launchctl', 'bootout', f'{domain}/{label}'], capture_output=True)
     subprocess.run(['launchctl', 'bootstrap', domain, str(plist)], check=True)
     print(plist)
 
