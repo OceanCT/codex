@@ -204,16 +204,16 @@ class MailTests(unittest.TestCase):
             self.assertEqual(message.get_content().strip(), 'file and reason')
 
     def test_notification_deduplicates_after_successful_delivery(self):
-        report = {'status': 'conflict', 'tag': 'rust-v1.1.0', 'previous': 'rust-v1.0.0', 'base_head': 'a', 'conflicts': ['shared.txt']}
+        report = {'status': 'functional_conflict', 'tag': 'rust-v1.1.0', 'previous': 'rust-v1.0.0', 'base_head': 'a', 'functional_conflict': {'feature': 'recycle bin', 'upstream_change': 'permanent deletion required', 'incompatibility': 'cannot retain recovery', 'attempted_resolution': 'separate recovery path rejected by required API contract', 'evidence': ['thread/delete contract']}}
         body = sync.markdown(report)
         marker = '<!-- codexy-email-sent:' + notify.hashlib.sha256(body.encode()).hexdigest() + ' -->'
-        issue = {'title': '[Codexy upstream] rust-v1.1.0: conflict', 'body': body + marker}
+        issue = {'title': '[Codexy upstream] rust-v1.1.0: functional_conflict', 'body': body + marker}
         with patch.object(notify, 'api', return_value=[issue]), patch.object(notify, 'send_mail') as send:
             notify.notify(report, 'OceanCT/codex')
             send.assert_not_called()
 
     def test_failed_delivery_does_not_set_sent_marker(self):
-        report = {'status': 'conflict', 'tag': 'rust-v1.1.0', 'previous': 'rust-v1.0.0', 'base_head': 'a', 'conflicts': ['shared.txt']}
+        report = {'status': 'functional_conflict', 'tag': 'rust-v1.1.0', 'previous': 'rust-v1.0.0', 'base_head': 'a', 'functional_conflict': {'feature': 'recycle bin', 'upstream_change': 'permanent deletion required', 'incompatibility': 'cannot retain recovery', 'attempted_resolution': 'separate recovery path rejected by required API contract', 'evidence': ['thread/delete contract']}}
         issue = {'number': 1, 'html_url': 'https://example.test/1'}
         with patch.dict(os.environ, {k: 'test' for k in ('SMTP_HOST', 'SMTP_PORT', 'SMTP_USERNAME', 'SMTP_PASSWORD', 'SMTP_FROM')}), patch.object(notify, 'api', side_effect=[[], issue]) as api, patch.object(notify, 'send_mail', side_effect=RuntimeError('SMTP failed')):
             with self.assertRaisesRegex(RuntimeError, 'SMTP failed'):

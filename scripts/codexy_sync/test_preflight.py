@@ -19,6 +19,12 @@ class PreflightTests(unittest.TestCase):
         self.assertEqual(result['proceed'], 'false')
         self.assertEqual(calls, 2)
 
+    def test_stale_release_dispatch_does_not_process_another_version(self):
+        with patch.dict(os.environ, {'REQUESTED_RELEASE_TAG': 'rust-v1.1.0'}):
+            result, calls = self.check({'tag_name': 'rust-v1.2.0'})
+        self.assertEqual(result['proceed'], 'false')
+        self.assertEqual(calls, 2)
+
     def test_identical_blocked_attempt_skips_even_closed_issue(self):
         release = {'tag_name': 'rust-v1.1.0', 'updated_at': 'today'}
         issue = {'state': 'closed', 'body': preflight.marker(preflight.attempt_key('a', release)), 'html_url': 'https://example.test/1'}

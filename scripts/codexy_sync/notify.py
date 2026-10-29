@@ -12,6 +12,19 @@ from sync import api, markdown
 from preflight import marker
 
 
+def needs_feature_decision(report):
+    """Text conflicts and infrastructure failures are not product tradeoffs."""
+    if report.get('status') != 'functional_conflict':
+        return False
+    evidence = report.get('functional_conflict', {})
+    required = ('feature', 'upstream_change', 'incompatibility', 'attempted_resolution')
+    return (all(isinstance(evidence.get(key), str) and evidence[key].strip()
+                for key in required)
+            and isinstance(evidence.get('evidence'), list)
+            and bool(evidence['evidence'])
+            and all(isinstance(item, str) and item.strip() for item in evidence['evidence']))
+
+
 def send_mail(subject, body, recipient):
     required = ('SMTP_HOST', 'SMTP_PORT', 'SMTP_USERNAME', 'SMTP_PASSWORD', 'SMTP_FROM')
     missing = [key for key in required if not os.environ.get(key)]
@@ -68,6 +81,9 @@ def notify(report, repository):
     else:
         issue = api(f"repos/{repository}/issues/{issue['number']}", 'PATCH', {'body': content})
     print(f"Report: {issue['html_url']}")
+    if not needs_feature_decision(report):
+        print('Diagnostic recorded; no confirmed feature tradeoff, no email.')
+        return
     if not all(os.environ.get(k) for k in ('SMTP_HOST', 'SMTP_PORT', 'SMTP_USERNAME', 'SMTP_PASSWORD', 'SMTP_FROM')):
         warning = 'Email NOT sent: SMTP secrets are not configured. Configure all five SMTP secrets and run manually with retry=true.'
         print('::warning::' + warning)

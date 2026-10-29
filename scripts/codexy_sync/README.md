@@ -1,9 +1,12 @@
 # Codexy upstream synchronization
 
-The controller lives on `OceanCT/codex`'s default branch. It checks published
-stable `openai/codex` releases once daily (01:17 UTC / 09:17 China time) and can be
-started manually in Actions. GitHub may delay scheduled runs. An upstream
-repository's release does not trigger this fork's `release` event.
+The controller lives on `OceanCT/codex`'s default branch. Release discovery runs
+on the user's Mac, not on an Actions cron. Install with
+`python3 scripts/codexy_sync/install_local_watch.py`. The launchd service wakes
+every 15 minutes, but checks for new stable releases only when 24 hours have
+elapsed since the last successful check. Idle wakeups only read local SQLite.
+An unfinished update takes priority over the daily interval. Sleep/offline time
+is caught up after the Mac wakes and the service runs again.
 
 The target is `oceanct/agents-recycle-bin`. `.codexy-upstream.json` on that
 branch pins the last integrated release and commit. Each run selects the next
@@ -20,8 +23,9 @@ SHA, release metadata, policy, integration/validation scripts and workflow. The
 same attempt is skipped even if its Issue is closed; a changed key or explicit
 `retry=true` permits another evaluation. No repeated builds or mail attempts occur
 for an unchanged blocked version. Configuring SMTP alone does not trigger a retry.
-Reports expire after seven days; Issues retain the reasons. Scheduled checks can
-be delayed by GitHub; integration latency is up to a day plus queue/build time.
+Reports expire after seven days; Issues retain the reasons. Discovery latency is
+up to a day plus local wakeup, queue and build time. The Mac must be logged in
+and online. GitHub workflow_dispatch remains available for explicit retries.
 
 A maintainer can reconcile textual conflicts on a separate branch and dispatch
 with `reviewed_candidate=<full commit SHA>`. The controller checks target ancestry,
@@ -61,7 +65,27 @@ registry and behavioral regression coverage when adding Codexy-specific behavior
 The controller must remain separate from upstream-controlled candidate code.
 The candidate build receives no repository token or SMTP credentials.
 
+## Local continuation state
+
+State lives in `~/.local/share/codexy-upstream/state/releases.sqlite3`; health and
+logs are alongside it. The service is `com.oceanct.codexy-upstream`. A release is
+persisted before dispatch, so concurrent wakeups and restarts cannot dispatch it
+twice. Failed discovery does not advance the daily timestamp. A dispatch timeout
+is reconciled against the published version and matching run title, never blindly
+resent. Only publication of the requested version completes a task.
+
+Queued/running jobs are followed on subsequent wakeups. Failed or successful-but-
+unpublished runs remain `needs_repair`, with the run URL; this watcher does not yet
+implement autonomous code repair. Ambiguous dispatches remain pending until a
+unique run or published version is found. These are unfinished tasks, not success.
+Do not delete their database records without checking GitHub for an existing run.
+
 ## Notification
+
+Operational failures and textual merge conflicts create diagnostic Issues without
+email. Only `functional_conflict` reports with the affected feature, upstream
+change, incompatibility, attempted resolution and concrete evidence send email.
+The watcher itself does not infer or manufacture these findings.
 
 Enable repository Issues for durable conflict reports. Configure these Actions
 secrets: `SMTP_HOST`, `SMTP_PORT`, `SMTP_USERNAME`, `SMTP_PASSWORD`, `SMTP_FROM`.

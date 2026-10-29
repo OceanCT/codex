@@ -255,6 +255,14 @@ def markdown(report):
              f"上游：{report.get('release_url', '')}",
              f"Codexy 基线：`{report['base_head']}`", '']
     lines.extend('- ' + reason for reason in report.get('reasons', []))
+    if report.get('functional_conflict'):
+        evidence = report['functional_conflict']
+        lines += ['', '### 需要功能取舍',
+                  f"Codexy 功能：{evidence.get('feature', '')}",
+                  f"上游修改：{evidence.get('upstream_change', '')}",
+                  f"无法兼容的原因：{evidence.get('incompatibility', '')}",
+                  f"尝试过的兼容方案：{evidence.get('attempted_resolution', '')}",
+                  *['- ' + item for item in evidence.get('evidence', [])]]
     for name, paths in report.get('features_touched', {}).items():
         lines += ['', f'### {name}', *[f'- `{p}`' for p in paths]]
     if report.get('conflicts'):

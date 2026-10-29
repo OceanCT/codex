@@ -38,6 +38,9 @@ def check(repository, retry=False):
     release = next_release(current)
     if release is None:
         return {'proceed': 'false', 'reason': 'No pending stable release.'}
+    requested = os.environ.get('REQUESTED_RELEASE_TAG', '')
+    if requested and requested != release['tag_name']:
+        return {'proceed': 'false', 'reason': 'Stale release dispatch; next pending release has changed.'}
     key = attempt_key(head, release)
     result = {'proceed': 'true', 'key': key, 'head': head, 'tag': release['tag_name'], 'reason': 'New attempt or explicit manual retry.'}
     if retry:

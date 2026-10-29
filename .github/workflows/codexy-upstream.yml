@@ -1,9 +1,12 @@
 name: Codexy upstream sync
+run-name: Codexy upstream ${{ inputs.release_tag || inputs.reviewed_candidate || 'manual' }}
 on:
-  schedule:
-    - cron: '17 1 * * *'
   workflow_dispatch:
     inputs:
+      release_tag:
+        description: 'Stable release discovered by the local watcher'
+        type: string
+        default: ''
       reviewed_candidate:
         description: 'Exact SHA of a manually reconciled candidate; full validation still required'
         type: string
@@ -47,6 +50,7 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           RETRY: ${{ inputs.retry }}
           REVIEWED_CANDIDATE: ${{ inputs.reviewed_candidate }}
+          REQUESTED_RELEASE_TAG: ${{ inputs.release_tag }}
         run: python3 controller/scripts/codexy_sync/preflight.py
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd
         if: steps.preflight.outputs.proceed == 'true'
