@@ -85,11 +85,27 @@ def check_once(state_dir, repository='OceanCT/codex', *, dispatch=False, now=Non
             return {'status': 'dispatched', 'tag': tag}
 
 
+def scheduled_idle(state_dir, now=None):
+    """Cheap read-only heartbeat gate; actual attempts still receive full history."""
+    now = time.time() if now is None else now
+    path = state_dir / 'releases.sqlite3'
+    if not path.exists():
+        return False
+    with closing(sqlite3.connect(path.resolve().as_uri() + '?mode=ro', uri=True)) as db:
+        if db.execute("SELECT 1 FROM releases WHERE status!='completed' LIMIT 1").fetchone():
+            return False
+        previous = db.execute('SELECT successful_at FROM checks WHERE repository=?', ('OceanCT/codex',)).fetchone()
+        return bool(previous and 0 <= now - previous[0] < DAY)
+
+
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument('--state-dir', type=Path, required=True)
     parser.add_argument('--dispatch', action='store_true')
+    parser.add_argument('--scheduled', action='store_true')
     args = parser.parse_args()
+    if args.scheduled and scheduled_idle(args.state_dir):
+        return
     os.environ.pop('REVIEWED_CANDIDATE', None)
     os.environ.pop('REQUESTED_RELEASE_TAG', None)
     now = datetime.now(timezone.utc).isoformat()

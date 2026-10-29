@@ -11,14 +11,17 @@ import time
 
 
 @contextmanager
-def database(state_dir):
-    state_dir.mkdir(parents=True, exist_ok=True, mode=0o700)
-    db = sqlite3.connect(state_dir / 'history.sqlite3', timeout=10)
+def database(state_dir, *, readonly=False):
+    if not readonly:
+        state_dir.mkdir(parents=True, exist_ok=True, mode=0o700)
+    path = state_dir / 'history.sqlite3'
+    db = sqlite3.connect(path.resolve().as_uri() + '?mode=ro', uri=True, timeout=10) if readonly else sqlite3.connect(path, timeout=10)
     db.row_factory = sqlite3.Row
     try:
-        db.execute('PRAGMA journal_mode=WAL')
-        db.execute('CREATE TABLE IF NOT EXISTS executions (id INTEGER PRIMARY KEY, task TEXT NOT NULL, started REAL NOT NULL, finished REAL, status TEXT NOT NULL, pid INTEGER, payload BLOB, raw_bytes INTEGER, source TEXT UNIQUE)')
-        db.execute('CREATE INDEX IF NOT EXISTS executions_task_id ON executions(task, id)')
+        if not readonly:
+            db.execute('PRAGMA journal_mode=WAL')
+            db.execute('CREATE TABLE IF NOT EXISTS executions (id INTEGER PRIMARY KEY, task TEXT NOT NULL, started REAL NOT NULL, finished REAL, status TEXT NOT NULL, pid INTEGER, payload BLOB, raw_bytes INTEGER, source TEXT UNIQUE)')
+            db.execute('CREATE INDEX IF NOT EXISTS executions_task_id ON executions(task, id)')
         yield db
         db.commit()
     finally:
@@ -38,7 +41,9 @@ def finish(state_dir, execution_id, result, stdout='', stderr=''):
 
 
 def rows(state_dir, task=None, limit=30, latest=False):
-    with database(state_dir) as db:
+    if not (state_dir / 'history.sqlite3').exists():
+        return []
+    with database(state_dir, readonly=True) as db:
         sql = 'SELECT id,task,started,finished,status,pid,raw_bytes,length(payload) AS stored_bytes FROM executions'
         args = []
         if latest:
@@ -62,7 +67,9 @@ def observed(value):
 
 
 def detail(state_dir, execution_id):
-    with database(state_dir) as db:
+    if not (state_dir / 'history.sqlite3').exists():
+        raise ValueError(f'Unknown execution: {execution_id}')
+    with database(state_dir, readonly=True) as db:
         row = db.execute('SELECT * FROM executions WHERE id=?',(execution_id,)).fetchone()
         if row is None:
             raise ValueError(f'Unknown execution: {execution_id}')

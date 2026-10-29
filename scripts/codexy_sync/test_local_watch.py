@@ -49,3 +49,26 @@ class LocalWatchTests(unittest.TestCase):
             self.assertEqual(local_watch.check_once(Path(temp), now=100)['status'], 'preview')
             self.assertEqual(local_watch.check_once(Path(temp), dispatch=True, now=101)['status'], 'idle')
             self.assertEqual(check.call_count, 2)
+
+class IdleResourceTests(unittest.TestCase):
+    def test_idle_scheduled_process_preserves_state_and_history(self):
+        import subprocess
+        import sys
+        import time
+        with tempfile.TemporaryDirectory() as temp:
+            state = Path(temp)
+            with patch.object(local_watch.preflight, 'check', return_value={'proceed':'false','reason':'No release'}):
+                local_watch.check_once(state,dispatch=True)
+            before = {p.name:p.read_bytes() for p in state.iterdir() if p.is_file()}
+            for _ in range(2):
+                subprocess.run([sys.executable,str(Path(local_watch.__file__)),'--state-dir',str(state),'--dispatch','--scheduled'],check=True,capture_output=True)
+            after = {p.name:p.read_bytes() for p in state.iterdir() if p.is_file()}
+            self.assertEqual(before,after)
+            self.assertFalse((state/'history.sqlite3').exists())
+            self.assertFalse(local_watch.scheduled_idle(state,now=time.time()+86401))
+            import sqlite3
+            from contextlib import closing
+            with closing(sqlite3.connect(state/'releases.sqlite3')) as db:
+                db.execute('INSERT INTO releases VALUES (?,?,?,?,?)',('OceanCT/codex','rust-v1.1.0','running','2026-01-01T00:00:00Z',''))
+                db.commit()
+            self.assertFalse(local_watch.scheduled_idle(state))

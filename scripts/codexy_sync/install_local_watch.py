@@ -37,7 +37,7 @@ def main():
     plist.parent.mkdir(parents=True, exist_ok=True)
     config = {
         'Label': label,
-        'ProgramArguments': [sys.executable, str(controller / 'scripts/codexy_sync/local_watch.py'), '--state-dir', str(root / 'state'), '--dispatch'],
+        'ProgramArguments': [sys.executable, str(controller / 'scripts/codexy_sync/local_watch.py'), '--state-dir', str(root / 'state'), '--dispatch', '--scheduled'],
         'WorkingDirectory': str(controller),
         'RunAtLoad': True,
         # A heartbeat allows incomplete work to resume; the durable 24h gate
@@ -45,11 +45,13 @@ def main():
         'StartInterval': 900,
         'ProcessType': 'Background',
         'Nice': 10,
+        'LowPriorityIO': True,
         'EnvironmentVariables': {'PATH': f'{home}/.local/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin', 'LANG': 'en_US.UTF-8'},
         'StandardOutPath': '/dev/null',
         'StandardErrorPath': str(root / 'logs/stderr.log'),
     }
     plist.write_bytes(plistlib.dumps(config))
+    subprocess.run(['launchctl', 'enable', f'{domain}/{label}'], check=True)
     subprocess.run(['launchctl', 'bootstrap', domain, str(plist)], check=True)
     print(plist)
 

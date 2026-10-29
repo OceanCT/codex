@@ -139,3 +139,17 @@ old records overwritten before this feature existed cannot be reconstructed.
 The daemon's normal output is stored in the compressed history rather than an
 unbounded plain-text stdout log. Startup failures before history initialization
 can still appear in `logs/stderr.log`.
+
+## Startup and idle resource use
+
+The LaunchAgent is explicitly enabled and starts when this user logs in after
+boot. It does not run before login or while the Mac is powered off. launchd owns
+the timer; no Python process remains resident between checks. Background process
+priority, nice level 10 and low-priority I/O reduce interference with interactive
+work. There is no KeepAlive busy-restart loop.
+
+Scheduled idle wakeups use a read-only daily/pending-task check and return without
+network access, new execution records, compression or health-file writes. Manual
+`run` still records the attempt. History inspection uses read-only SQLite access;
+compressed payloads are only decompressed by `show`. The interactive status viewer
+exists only while the user runs it and stops on Ctrl-C.
