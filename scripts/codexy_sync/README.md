@@ -122,8 +122,15 @@ The installer also installs `~/.local/bin/codexy-daemon`:
   pending updates and each task's latest execution.
 - `codexy-daemon status --watch`: refresh the local view every two seconds; Ctrl-C
   exits the viewer without stopping the service or triggering GitHub calls.
-- `codexy-daemon tasks`: latest execution per task. `release-check` is the
-  discovery task; `release:rust-vX.Y.Z` identifies a release update.
+- `codexy-daemon projects`: list long-lived projects (`tasks` is an alias).
+  `codexy-upstream` owns the discovery and release-update executions.
+- `codexy-daemon status codexy-upstream`: project goal, schedule, pending work
+  and recent executions.
+- `codexy-daemon history codexy-upstream`: all executions in this project.
+- `codexy-daemon changes codexy-upstream`: configuration/install changes and
+  update state transitions, with commit or execution references.
+- `codexy-daemon logs codexy-upstream 12`: details of execution 12, checked
+  against its owning project. Existing `show 12` remains supported.
 - `codexy-daemon history --limit 30`: execution index; optionally filter with
   `--task release-check` or `--task release:rust-vX.Y.Z`.
 - `codexy-daemon show 12`: decompress and inspect execution 12, including result,
@@ -153,3 +160,10 @@ network access, new execution records, compression or health-file writes. Manual
 `run` still records the attempt. History inspection uses read-only SQLite access;
 compressed payloads are only decompressed by `show`. The interactive status viewer
 exists only while the user runs it and stops on Ctrl-C.
+
+Project migration keeps execution IDs and gzip payloads unchanged and creates
+`state/history.before-projects.sqlite3` before the first installed migration.
+Imported legacy data belongs to the existing project; it is never listed as a
+separate project. Changelogs start when this feature is installed; earlier code
+changes are not inferred from execution logs. Repeated observations of the same
+release state are retained as executions but do not duplicate changelog entries.
