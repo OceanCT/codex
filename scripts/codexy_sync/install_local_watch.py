@@ -1,5 +1,6 @@
 """Install the local watcher without copying GitHub or SMTP credentials."""
 import os
+import json
 from pathlib import Path
 import plistlib
 import shutil
@@ -27,9 +28,13 @@ def main():
                 if path.is_file() and path.suffix in ('.py', '.json', '.sh', '.md'):
                     shutil.copy2(path, dest / path.name)
         else:
-            shutil.copy2(source / relative / 'codexy-upstream.yml', dest / 'codexy-upstream.yml')
+            for workflow in ('codexy-upstream.yml', 'codexy-package.yml'):
+                shutil.copy2(source / relative / workflow, dest / workflow)
     (root / 'state').mkdir(mode=0o700, exist_ok=True)
     (root / 'logs').mkdir(mode=0o700, exist_ok=True)
+    delivery_policy = root / 'state/delivery-policy.json'
+    if not delivery_policy.exists():
+        delivery_policy.write_text(json.dumps({'enabled': True}) + '\n')
     existing = root / 'state/history.sqlite3'
     backup = root / 'state/history.before-projects.sqlite3'
     if existing.exists() and not backup.exists():

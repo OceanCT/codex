@@ -44,6 +44,9 @@ def status(root, project=history.PROJECT):
                 print(f'{repository}: last successful discovery {history.timestamp(stamp)}; next due {history.timestamp(stamp+86400)}')
             for tag, state, detail in db.execute("SELECT tag,status,detail FROM releases WHERE status!='completed'"):
                 print(f'Pending {tag}: {state} {detail}')
+    delivery = root/'state/delivery.json'
+    if delivery.exists():
+        print('Local delivery:', json.dumps(json.loads(delivery.read_text()), ensure_ascii=False))
     print('Latest executions:')
     print_rows(history.rows(root/'state',limit=5,project=project))
 

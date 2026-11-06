@@ -76,8 +76,9 @@ resent. Only publication of the requested version completes a task.
 
 Queued/running jobs are followed on subsequent wakeups. Failed or successful-but-
 unpublished runs remain `needs_repair`, with the run URL; this watcher does not yet
-implement autonomous code repair. Ambiguous dispatches remain pending until a
-unique run or published version is found. These are unfinished tasks, not success.
+implement autonomous code repair. Explicit HTTP rejections retain their reason and retry after six hours.
+Timeouts and ambiguous dispatches remain pending until a unique run or published
+version is found; run lookup is paginated. These are unfinished tasks, not success.
 Do not delete their database records without checking GitHub for an existing run.
 
 ## Notification
@@ -111,8 +112,8 @@ run `python3 /path/to/controller/scripts/codexy_sync/sync.py prepare --repo
 candidate. A clean result creates a detached candidate commit, never a remote
 push. JSON and Markdown reports contain the full evidence.
 
-GitHub source updates do not install binaries on the user's Mac or restart a live
-Codexy daemon. Local installation remains the explicit workflow in `CODEX-Y.md`.
+Source publication is followed by a separate native package workflow and local delivery.
+See the native delivery section below. The original manual installer remains available.
 
 ## Daemon CLI and compressed execution history
 
@@ -167,3 +168,46 @@ Imported legacy data belongs to the existing project; it is never listed as a
 separate project. Changelogs start when this feature is installed; earlier code
 changes are not inferred from execution logs. Repeated observations of the same
 release state are retained as executions but do not duplicate changelog entries.
+
+## Native delivery and feature transitions
+
+The installed watcher enables `state/delivery-policy.json` (`enabled: true`). Set
+it to false to disable local delivery while retaining source discovery. Both
+stages are visible in `codexy-daemon status codexy-upstream`; source publication
+alone is not an installed/running-version success.
+
+`codexy-package.yml` builds the exact published target commit on a native macOS
+runner, verifies the paired CLI/Code Mode Host and runs the Codexy regressions.
+A successful workflow uploads a manifest binding source SHA, upstream version,
+architecture and SHA-256 of each runtime component. The watcher only downloads
+successful runs of this workflow on main, checks the manifest, runs isolated
+version/host probes, and atomically selects an immutable package. Old packages
+remain available. It does not install the official binary over the fork, compile
+locally, or modify the original `.codex` home.
+
+Activation uses the existing daemon's SIGHUP graceful-only drain, after checking
+its PID start time and executable path. No forced signal or deadline is used.
+Active turns finish before the server disconnects; new turns are refused while
+draining. The next heartbeat starts the selected runtime if clients have not
+already reconnected. CLI, installed and running versions remain separate states.
+An activation/probe failure restores the previous selection and is recorded as
+`activation_failed`, requiring investigation instead of reinstalling indefinitely.
+Build failures retain their run URL and require repair; they are never called
+successful delivery. HTTP rejection retries use a six-hour backoff. Uncertain
+package dispatches are reconciled without duplicate submissions.
+
+New upstream defaults arrive with the binary. Experimental switches and explicit
+user opt-outs are not blindly enabled. Memory v2 has one managed transition:
+on a supported running runtime, existing default v1 profiles enable dual-write,
+retain v1 reads, then select v2 after the upstream readiness boundary (20
+consolidated threads and a valid v2 summary). Original memory files are never
+rewritten or deleted by the controller. Config backups are private; explicit
+version choices and disabled memory flags are preserved. Fresh profiles use the
+upstream v2 default. Changes apply to new sessions; the transition does not
+manufacture memories or spend quota on synthetic chats.
+
+GitHub can reject workflow dispatch even when the repository Actions settings
+say enabled. `dispatch_rejected` includes that external reason. Fix account or
+GitHub service restrictions outside the updater; it will retry afterward. Until
+a native build actually passes, local staging tests do not establish that the
+new Rust runtime works on the user's machine.

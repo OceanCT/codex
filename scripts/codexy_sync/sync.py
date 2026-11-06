@@ -21,11 +21,26 @@ def git(repo, *args, check=True, input=None):
     return run('git', *args, cwd=repo, check=check, input=input)
 
 
+class ApiError(RuntimeError):
+    """Keep the HTTP rejection reason without logging request bodies or credentials."""
+    def __init__(self, status, message):
+        self.status = status
+        super().__init__(f'GitHub HTTP {status or "unknown"}: {message[:1000]}')
+
+
 def api(path, method='GET', body=None):
     args = ['gh', 'api', path, '--method', method]
     if body is not None:
         args += ['--input', '-']
-    value = run(*args, input=json.dumps(body) if body is not None else None).stdout
+    result = run(*args, input=json.dumps(body) if body is not None else None, check=False)
+    if result.returncode:
+        match = re.search(r'HTTP (\d{3})', result.stderr)
+        try:
+            message = json.loads(result.stdout).get('message', 'Request failed')
+        except (ValueError, AttributeError):
+            message = 'Request failed; check connectivity and gh authentication'
+        raise ApiError(int(match[1]) if match else None, message)
+    value = result.stdout
     return json.loads(value) if value.strip() else None
 
 

@@ -1,0 +1,74 @@
+name: Codexy native package
+run-name: Codexy package ${{ inputs.source_sha }} ${{ inputs.machine }}
+on:
+  workflow_dispatch:
+    inputs:
+      source_sha:
+        description: Validated source commit on the Codexy branch
+        required: true
+        type: string
+      machine:
+        description: Native macOS architecture
+        type: choice
+        options: [x86_64, arm64]
+        default: x86_64
+permissions:
+  contents: read
+concurrency:
+  group: codexy-native-package
+  cancel-in-progress: false
+jobs:
+  package:
+    if: github.repository == 'OceanCT/codex'
+    runs-on: ${{ inputs.machine == 'arm64' && 'macos-15' || 'macos-15-intel' }}
+    timeout-minutes: 180
+    env:
+      CARGO_BUILD_JOBS: '2'
+      CARGO_INCREMENTAL: '0'
+      CARGO_PROFILE_DEV_DEBUG: '0'
+      CARGO_PROFILE_TEST_DEBUG: '0'
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd
+        with:
+          path: controller
+          persist-credentials: false
+          sparse-checkout: scripts/codexy_sync
+      - name: Check exact published source
+        env:
+          GH_TOKEN: ${{ github.token }}
+          SOURCE_SHA: ${{ inputs.source_sha }}
+        run: |
+          python3 - <<'PY'
+          import os, re, sys
+          sys.path.insert(0, 'controller/scripts/codexy_sync')
+          from sync import api
+          sha = os.environ['SOURCE_SHA']
+          assert re.fullmatch(r'[0-9a-f]{40}', sha)
+          current = api('repos/OceanCT/codex/git/ref/heads/oceanct/agents-recycle-bin')['object']['sha']
+          assert current == sha, 'Source has been superseded; use the current validated target'
+          PY
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd
+        with:
+          ref: ${{ inputs.source_sha }}
+          path: candidate
+          persist-credentials: false
+      - name: Install native validation dependencies
+        run: |
+          brew install just cargo-nextest dotslash poppler
+          brew install --cask basictex
+          echo /Library/TeX/texbin >> "$GITHUB_PATH"
+          sudo /Library/TeX/texbin/tlmgr update --self
+          sudo /Library/TeX/texbin/tlmgr install standalone preview varwidth mathtools xcolor
+      - name: Verify sandbox-enabled V8 artifacts
+        run: python3 controller/scripts/codexy_sync/setup_v8.py candidate "$RUNNER_TEMP/rusty-v8"
+      - name: Build and test native Codexy
+        working-directory: candidate
+        run: bash ../controller/scripts/codexy_sync/validate.sh
+      - name: Package validated source and paired binaries
+        run: python3 controller/scripts/codexy_sync/package_runtime.py candidate package
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: codexy-macos-${{ inputs.machine }}
+          retention-days: 30
+          path: package/
+          if-no-files-found: error

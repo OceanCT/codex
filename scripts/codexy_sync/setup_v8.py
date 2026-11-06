@@ -1,6 +1,7 @@
 """Fetch the exact sandbox-enabled V8 artifacts pinned by the candidate source."""
 import hashlib
 import os
+import platform
 from pathlib import Path
 import re
 import sys
@@ -28,7 +29,8 @@ def main():
     version = versions.pop()
     if not re.fullmatch(r'\d+\.\d+\.\d+', version):
         raise ValueError('Unsupported V8 version')
-    target = 'x86_64-unknown-linux-gnu'
+    target = (('aarch64' if platform.machine() == 'arm64' else 'x86_64') + '-apple-darwin'
+              if platform.system() == 'Darwin' else 'x86_64-unknown-linux-gnu')
     profile = 'ptrcomp_sandbox_release'
     manifest_name = f'rusty_v8_{profile}_{target}.sha256'
     archive = f'librusty_v8_{profile}_{target}.a.gz'
