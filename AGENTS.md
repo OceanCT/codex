@@ -1,3 +1,10 @@
+# Codexy execution policy
+
+All Codexy integration, builds and tests must run locally. Never dispatch GitHub
+Actions or use a hosted runner as a fallback, including when disk or CPU is
+insufficient. GitHub is only a source/backup remote. Preserve this policy in the
+installed watcher. Use one local build job and the single-test local profile.
+
 # Rust/codex-rs
 
 In the codex-rs folder where the rust code lives:

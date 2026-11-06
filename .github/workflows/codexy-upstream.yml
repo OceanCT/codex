@@ -26,7 +26,7 @@ concurrency:
   cancel-in-progress: false
 jobs:
   sync:
-    if: github.repository == 'OceanCT/codex'
+    if: ${{ false }} # User policy: all execution is local; never run on Actions.
     runs-on: ubuntu-24.04
     timeout-minutes: 180
     env:

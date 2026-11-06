@@ -29,6 +29,8 @@ class ApiError(RuntimeError):
 
 
 def api(path, method='GET', body=None):
+    if method != 'GET' and '/actions/' in path:
+        raise RuntimeError('Codexy is local-only: GitHub Actions execution is prohibited')
     args = ['gh', 'api', path, '--method', method]
     if body is not None:
         args += ['--input', '-']

@@ -33,8 +33,8 @@ def main():
     (root / 'state').mkdir(mode=0o700, exist_ok=True)
     (root / 'logs').mkdir(mode=0o700, exist_ok=True)
     delivery_policy = root / 'state/delivery-policy.json'
-    if not delivery_policy.exists():
-        delivery_policy.write_text(json.dumps({'enabled': True}) + '\n')
+    # User policy: never fall back to GitHub execution.
+    delivery_policy.write_text(json.dumps({'enabled': False, 'execution': 'local-only'}) + '\n')
     existing = root / 'state/history.sqlite3'
     backup = root / 'state/history.before-projects.sqlite3'
     if existing.exists() and not backup.exists():
@@ -46,6 +46,18 @@ def main():
     if revision.returncode == 0:
         commit = revision.stdout.strip()
         history.change(root / 'state', '安装守护任务 CLI 版本 ' + commit[:10], kind='installation', detail={'commit':commit}, source='install:' + commit)
+    releases = root / 'state/releases.sqlite3'
+    retired_backup = root / 'state/releases.before-local-only.sqlite3'
+    if releases.exists():
+        with closing(sqlite3.connect(releases)) as db:
+            if not retired_backup.exists():
+                with closing(sqlite3.connect(retired_backup)) as backup:
+                    db.backup(backup)
+            db.execute("UPDATE releases SET status='retired_remote' WHERE status NOT IN ('completed','retired_remote')")
+            db.commit()
+    with history.database(root / 'state') as db:
+        db.execute('UPDATE projects SET goal=? WHERE id=?', ('所有合并、编译、测试和安装只在本机推进；禁止 GitHub Actions 执行或云端回退。', history.PROJECT))
+    history.change(root / 'state', '切换为永久本地执行；停用远程派发并保留原始记录', source='local-only-policy-v1')
     launcher = home / '.local/bin/codexy-daemon'
     launcher.parent.mkdir(parents=True, exist_ok=True)
     launcher.write_text('#!/bin/sh\nexec ' + shlex.quote(sys.executable) + ' ' + shlex.quote(str(controller / 'scripts/codexy_sync/daemon_cli.py')) + ' "$@"\n')
@@ -63,7 +75,7 @@ def main():
         'ProcessType': 'Background',
         'Nice': 10,
         'LowPriorityIO': True,
-        'EnvironmentVariables': {'PATH': f'{home}/.local/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin', 'LANG': 'en_US.UTF-8'},
+        'EnvironmentVariables': {'PATH': f'{home}/.cargo/bin:{home}/.local/bin:/Library/TeX/texbin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin', 'LANG': 'en_US.UTF-8'},
         'StandardOutPath': '/dev/null',
         'StandardErrorPath': str(root / 'logs/stderr.log'),
     }

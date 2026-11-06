@@ -38,18 +38,18 @@ def status(root, project=history.PROJECT):
     print("Goal:", info["goal"])
     print('Service:', service_state())
     path = root/'state/releases.sqlite3'
-    if project == history.PROJECT and path.exists():
+    if project == history.PROJECT and path.exists() and not (root/'state/local-pipeline.json').exists():
         with closing(sqlite3.connect(path)) as db:
             for repository, stamp in db.execute('SELECT repository,successful_at FROM checks'):
                 print(f'{repository}: last successful discovery {history.timestamp(stamp)}; next due {history.timestamp(stamp+86400)}')
-            for tag, state, detail in db.execute("SELECT tag,status,detail FROM releases WHERE status!='completed'"):
+            for tag, state, detail in db.execute("SELECT tag,status,detail FROM releases WHERE status NOT IN ('completed','retired_remote')"):
                 print(f'Pending {tag}: {state} {detail}')
                 if state == 'dispatch_rejected':
                     print('  Retry after:', history.timestamp(json.loads(detail)['retry_at']))
-    delivery = root/'state/delivery.json'
+    delivery = root/'state/local-pipeline.json'
     if delivery.exists():
         value = json.loads(delivery.read_text())
-        print('Local delivery:', json.dumps(value, ensure_ascii=False))
+        print('Local execution:', json.dumps(value, ensure_ascii=False))
         if value.get('retry_at'):
             print('  Retry after:', history.timestamp(value['retry_at']))
     print('Latest executions:')

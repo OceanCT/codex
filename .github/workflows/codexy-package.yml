@@ -19,7 +19,7 @@ concurrency:
   cancel-in-progress: false
 jobs:
   package:
-    if: github.repository == 'OceanCT/codex'
+    if: ${{ false }} # User policy: all execution is local; never run on Actions.
     runs-on: ${{ inputs.machine == 'arm64' && 'macos-15' || 'macos-15-intel' }}
     timeout-minutes: 180
     env:

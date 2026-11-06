@@ -70,5 +70,6 @@
         "codex-rs/tui/src/app/tests/model_provider_selection_tests.rs"
       ]
     }
-  }
+  },
+  "execution": "local-only"
 }

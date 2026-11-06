@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Run inside the disposable candidate checkout, with no repository write token.
 set -euo pipefail
-export CARGO_BUILD_JOBS=2
+export CARGO_BUILD_JOBS="${CARGO_BUILD_JOBS:-1}"
 for tool in just cargo pdflatex pdftocairo pdfinfo; do command -v "$tool" >/dev/null; done
 python3 scripts/test_render_codex_y_latex.py
 runtime_builder="$(cd "$(dirname "$0")" && pwd)/build_runtime.py"
@@ -19,4 +19,4 @@ just test --locked -p codex-tui rollout_history
 just test --locked -p codex-tui image_generation
 just test --locked -p codex-tui rich_media
 just test --locked -p codex-tui agents_opens_unloaded_history_on_the_cli_stack
-python3 ../scripts/smoke_codex_y_host.py target/debug/codex-code-mode-host
+python3 ../scripts/smoke_codex_y_host.py "${CARGO_TARGET_DIR:-target}/debug/codex-code-mode-host"

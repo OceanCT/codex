@@ -34,7 +34,7 @@ class ExecutionHistoryTests(unittest.TestCase):
             value = json.loads(result.stdout)
             self.assertEqual(value['status'],'error')
             self.assertIn('network test failure',value['detail']['stderr'])
-            result = subprocess.run([sys.executable,str(cli),'--root',str(root),'history','--task','release-check'],capture_output=True,text=True,check=True)
+            result = subprocess.run([sys.executable,str(cli),'--root',str(root),'history','--task','local-update'],capture_output=True,text=True,check=True)
             self.assertIn('idle',result.stdout)
             self.assertIn('error',result.stdout)
             with history.database(state) as db:
