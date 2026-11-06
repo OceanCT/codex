@@ -45,13 +45,15 @@ def start(state_dir, task, project=PROJECT):
 def finish(state_dir, execution_id, result, stdout='', stderr=''):
     raw = json.dumps({'result':result,'stdout':stdout,'stderr':stderr}, ensure_ascii=False).encode()
     with database(state_dir) as db:
+        task = db.execute('SELECT task FROM executions WHERE id=?', (execution_id,)).fetchone()[0]
+        stage = 'local-delivery' if task.startswith('local-delivery') else 'release'
         db.execute('UPDATE executions SET task=COALESCE(?,task), finished=?, status=?, payload=?, raw_bytes=? WHERE id=?',
-                   ('release:'+result['tag'] if result.get('tag') else None, time.time(), result['status'], gzip.compress(raw), len(raw), execution_id))
-        if result.get('tag') and result['status'] in ('dispatched','completed','needs_repair'):
+                   (stage+':'+result['tag'] if result.get('tag') else None, time.time(), result['status'], gzip.compress(raw), len(raw), execution_id))
+        if result.get('tag') and result['status'] in ('dispatched','completed','needs_repair','dispatch_rejected','active','activation_failed'):
             project = db.execute('SELECT project FROM executions WHERE id=?',(execution_id,)).fetchone()[0]
-            source = project + ':' + result['tag'] + ':' + result['status']
+            source = project + ':' + stage + ':' + result['tag'] + ':' + result['status']
             db.execute('INSERT OR IGNORE INTO changes(project,occurred,kind,summary,execution_id,payload,source) VALUES (?,?,?,?,?,?,?)',
-                       (project,time.time(),'update',result['tag'] + ': ' + result['status'],execution_id,gzip.compress(raw),source))
+                       (project,time.time(),'update',stage + ' ' + result['tag'] + ': ' + result['status'],execution_id,gzip.compress(raw),source))
 
 
 def rows(state_dir, task=None, limit=30, latest=False, project=PROJECT):

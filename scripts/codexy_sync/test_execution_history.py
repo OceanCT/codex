@@ -64,3 +64,14 @@ class ExecutionHistoryTests(unittest.TestCase):
             self.assertEqual(history.detail(state,records[0]['id'])['detail']['text'],text)
             self.assertLess(records[0]['stored_bytes'],records[0]['raw_bytes'])
             self.assertEqual((logs/'stdout.log').read_text(),'')
+
+
+class DeliveryHistoryTests(unittest.TestCase):
+    def test_delivery_does_not_relabel_or_deduplicate_source_update(self):
+        with tempfile.TemporaryDirectory() as temp:
+            state=Path(temp)
+            for task in ('release-check','local-delivery'):
+                execution=history.start(state,task)
+                history.finish(state,execution,{'status':'dispatched','tag':'rust-v0.165.0'})
+            self.assertEqual({r['task'] for r in history.rows(state)}, {'release:rust-v0.165.0','local-delivery:rust-v0.165.0'})
+            self.assertEqual(len(history.changes(state)),2)
