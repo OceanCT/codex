@@ -13,7 +13,7 @@ def attempt_key(head, release):
     digest = hashlib.sha256()
     digest.update(json.dumps([head, release['tag_name'], release.get('updated_at')]).encode())
     root = Path(__file__).parent
-    for name in ('policy.json', 'sync.py', 'validate.sh', 'setup_v8.py', 'preflight.py'):
+    for name in ('policy.json', 'sync.py', 'validate.sh', 'setup_v8.py', 'build_runtime.py', 'preflight.py'):
         digest.update((root / name).read_bytes())
     digest.update((root.parent.parent / '.github/workflows/codexy-upstream.yml').read_bytes())
     return digest.hexdigest()

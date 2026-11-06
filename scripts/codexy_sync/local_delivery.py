@@ -14,7 +14,7 @@ import sys
 import tempfile
 import time
 
-from package_runtime import FILES
+from package_runtime import FILES, OPTIONAL_FILES
 from sync import api, ApiError, version
 
 WORKFLOW = 'codexy-package.yml'
@@ -31,9 +31,10 @@ def verify(package, sha, tag):
     manifest = json.loads((package / 'manifest.json').read_text())
     if (manifest['source_sha'], manifest['upstream_tag'], manifest['system'], manifest['machine']) != (sha, tag, platform.system(), platform.machine()):
         raise ValueError('Runtime package source/version/platform mismatch')
-    if set(manifest['files']) != set(FILES) or {p.name for p in package.iterdir()} != set(FILES) | {'manifest.json'}:
+    names = set(manifest['files'])
+    if not set(FILES) <= names <= set(FILES + OPTIONAL_FILES) or {p.name for p in package.iterdir()} != names | {'manifest.json'}:
         raise ValueError('Unexpected runtime package contents')
-    for name in FILES:
+    for name in names:
         path = package / name
         if path.is_symlink() or not path.is_file():
             raise ValueError('Runtime must contain regular files')
@@ -45,8 +46,9 @@ def verify(package, sha, tag):
 
 def install(package, home, sha, tag):
     verify(package, sha, tag)
-    for name in ('codex', 'codex-code-mode-host'):
-        (package / name).chmod(0o755)
+    for name in ('codex', 'codex-code-mode-host') + OPTIONAL_FILES:
+        if (package / name).exists():
+            (package / name).chmod(0o755)
     # Probes cannot touch the user's sessions or credentials.
     with tempfile.TemporaryDirectory() as isolated:
         env = dict(os.environ, CODEX_HOME=isolated)

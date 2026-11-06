@@ -4,8 +4,9 @@ set -euo pipefail
 export CARGO_BUILD_JOBS=2
 for tool in just cargo pdflatex pdftocairo pdfinfo; do command -v "$tool" >/dev/null; done
 python3 scripts/test_render_codex_y_latex.py
+runtime_builder="$(cd "$(dirname "$0")" && pwd)/build_runtime.py"
 cd codex-rs
-cargo build --locked -p codex-cli -p codex-code-mode-host --bin codex --bin codex-code-mode-host
+python3 "$runtime_builder"
 # Separate filters fail on an empty selection rather than silently skipping a feature.
 just test --locked -p codex-app-server-protocol schema_fixtures_tests
 just test --locked -p codex-app-server thread_trash
