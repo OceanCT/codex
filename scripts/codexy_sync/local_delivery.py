@@ -9,6 +9,7 @@ import platform
 import re
 import shutil
 import signal
+import shlex
 import subprocess
 import sys
 import tempfile
@@ -145,12 +146,19 @@ def runtime_status(home, state):
     actual = process.stdout.strip()
     prefix = record["processStartTime"]
     command = actual.removeprefix(prefix).strip()
-    executable = command.split(" ", 1)[0]
+    arguments = shlex.split(command)
+    executable = arguments[0] if arguments else ""
+    local_listener = any(
+        pair == ["--listen", "unix://"]
+        for pair in (arguments[index:index + 2] for index in range(len(arguments) - 1))
+    )
     allowed = home / ".local/share/codex-y"
     if (
         not actual.startswith(prefix)
         or not Path(executable).is_relative_to(allowed)
-        or " app-server --listen unix:// --managed-daemon" not in command
+        or arguments[1:2] != ["app-server"]
+        or "--managed-daemon" not in arguments[2:]
+        or not local_listener
     ):
         return {
             "status": "restart_blocked",

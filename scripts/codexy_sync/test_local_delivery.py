@@ -111,6 +111,26 @@ class DeliveryTests(unittest.TestCase):
                 kill.assert_not_called()
 
 
+    def test_active_daemon_accepts_optional_startup_arguments(self):
+        with tempfile.TemporaryDirectory() as temp:
+            home = Path(temp)
+            package = home/'.local/share/codex-y/current'
+            (package/'bin').mkdir(parents=True)
+            binary = package/'bin/codex'
+            binary.touch()
+            selected = home/'.codex-y/packages/app-server-daemon/current'
+            selected.parent.mkdir(parents=True)
+            selected.symlink_to(package)
+            pid_file = home/'.codex-y/app-server-daemon/daemon.pid'
+            pid_file.parent.mkdir(parents=True)
+            stamp = 'Sat Nov  7 23:53:04 2026'
+            pid_file.write_text(json.dumps({'pid':42, 'processStartTime':stamp}))
+            results = [subprocess.CompletedProcess([],0,'{"status":"running","appServerVersion":"0.165.0"}'),
+                       subprocess.CompletedProcess([],0,f'{stamp} {binary} app-server --listen unix:// --analytics-default-enabled --managed-daemon')]
+            with patch.object(delivery.subprocess,'run',side_effect=results), patch.object(delivery.os,'kill') as kill:
+                self.assertEqual(delivery.runtime_status(home,{'tag':'rust-v0.165.0'}),{'status':'active','version':'0.165.0'})
+                kill.assert_not_called()
+
     def test_pid_reuse_never_signals_other_process(self):
         with tempfile.TemporaryDirectory() as temp:
             home=Path(temp); path=home/'.codex-y/app-server-daemon/daemon.pid'
