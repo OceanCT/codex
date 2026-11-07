@@ -71,7 +71,8 @@ def main():
         'RunAtLoad': True,
         # A heartbeat allows incomplete work to resume; the durable 24h gate
         # prevents release API checks on idle heartbeats.
-        'StartInterval': 900,
+        # Restart gaps must not outlast existing TUI reconnect windows.
+        'StartInterval': 30,
         'ProcessType': 'Background',
         'Nice': 10,
         'LowPriorityIO': True,

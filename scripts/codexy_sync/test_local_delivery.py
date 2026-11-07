@@ -75,6 +75,42 @@ class DeliveryTests(unittest.TestCase):
                 self.assertEqual(delivery.runtime_status(home, state)['status'], 'draining')
                 kill.assert_called_once_with(42, signal.SIGHUP)
 
+    def test_unavailable_version_probe_starts_daemon_without_rollback(self):
+        with tempfile.TemporaryDirectory() as temp:
+            home = Path(temp)
+            results = [
+                subprocess.CompletedProcess([], 1, "", "socket unavailable"),
+                subprocess.CompletedProcess([], 0, '{"status":"started"}', ""),
+            ]
+            with patch.object(delivery.subprocess, "run", side_effect=results) as run:
+                self.assertEqual(
+                    delivery.runtime_status(home, {"tag": "rust-v0.165.0"}),
+                    {"status": "starting"},
+                )
+            self.assertEqual(
+                run.call_args_list[1].args[0][-3:], ["app-server", "daemon", "start"]
+            )
+
+
+    def test_transient_probe_timeout_keeps_retrying_without_signals(self):
+        with tempfile.TemporaryDirectory() as temp:
+            with (
+                patch.object(
+                    delivery.subprocess,
+                    "run",
+                    side_effect=subprocess.TimeoutExpired("version", 15),
+                ),
+                patch.object(delivery.os, "kill") as kill,
+            ):
+                self.assertEqual(
+                    delivery.runtime_status(Path(temp), {"tag": "rust-v0.165.0"})[
+                        "status"
+                    ],
+                    "awaiting_runtime",
+                )
+                kill.assert_not_called()
+
+
     def test_pid_reuse_never_signals_other_process(self):
         with tempfile.TemporaryDirectory() as temp:
             home=Path(temp); path=home/'.codex-y/app-server-daemon/daemon.pid'
