@@ -9,6 +9,7 @@ import subprocess
 import sys
 import time
 
+from build_runtime import v8_env
 import execution_history as history
 from local_delivery import install, runtime_status, save
 from memory_transition import advance_memory
@@ -37,6 +38,7 @@ def validate(repo, state_dir, cache):
     for tool in ('cargo', 'rustc', 'just', 'cargo-nextest', 'pdflatex', 'pdftocairo', 'pdfinfo'):
         if not shutil.which(tool, path=env['PATH']):
             raise RuntimeError('Missing local validation dependency: ' + tool)
+    env = v8_env(repo, env)
     with (state_dir/'validation.log').open('w') as log:
         subprocess.run(['nice', '-n', '10', 'bash', str(Path(__file__).with_name('validate.sh'))],
                        cwd=repo, env=env, stdout=log, stderr=subprocess.STDOUT, check=True)
