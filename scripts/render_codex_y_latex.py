@@ -12,7 +12,10 @@ import tempfile
 
 
 def child_limits():
-    os.nice(10)
+    # Background updaters may already run at the lowest scheduling priority.
+    priority = os.getpriority(os.PRIO_PROCESS, 0)
+    if priority < 19:
+        os.nice(min(10, 19 - priority))
     resource.setrlimit(resource.RLIMIT_CPU, (3, 3))
     resource.setrlimit(resource.RLIMIT_FSIZE, (8 * 1024 * 1024, 8 * 1024 * 1024))
     resource.setrlimit(resource.RLIMIT_NOFILE, (128, 128))

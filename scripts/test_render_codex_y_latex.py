@@ -1,6 +1,7 @@
 """Local integration checks for the optional TeX renderer; no network access."""
 
 from pathlib import Path
+import os
 import shutil
 import subprocess
 import sys
@@ -16,7 +17,7 @@ import unittest
     "local TeX and Poppler are required",
 )
 class LatexRendererTests(unittest.TestCase):
-    def render(self, source, work):
+    def render(self, source, work, *, background=False):
         path = Path(work)
         (path / "input.txt").write_text(source)
         return subprocess.run(
@@ -26,8 +27,20 @@ class LatexRendererTests(unittest.TestCase):
                 str(path / "input.txt"),
                 str(path / "output.png"),
             ],
-            stdout=subprocess.DEVNULL,
-            stderr=subprocess.DEVNULL,
+            capture_output=True,
+            text=True,
+            preexec_fn=(
+                lambda: os.setpriority(
+                    os.PRIO_PROCESS,
+                    0,
+                    max(
+                        20 if sys.platform == "darwin" else 19,
+                        os.getpriority(os.PRIO_PROCESS, 0),
+                    ),
+                )
+            )
+            if background
+            else None,
             timeout=12,
         )
 
@@ -38,10 +51,21 @@ class LatexRendererTests(unittest.TestCase):
             r"\int_0^1 x^2\,dx=\frac13",
         ):
             with self.subTest(source=source), tempfile.TemporaryDirectory() as work:
-                self.assertEqual(self.render(source, work).returncode, 0)
+                result = self.render(source, work)
+                self.assertEqual(result.returncode, 0, result.stderr)
                 png = (Path(work) / "output.png").read_bytes()
                 self.assertTrue(png.startswith(b"\x89PNG\r\n\x1a\n"))
                 self.assertLess(len(png), 8 * 1024 * 1024)
+
+    def test_render_from_lowest_priority_background_process(self):
+        with tempfile.TemporaryDirectory() as work:
+            result = self.render(r"\frac{1}{2}", work, background=True)
+            self.assertEqual(result.returncode, 0, result.stderr)
+            self.assertTrue(
+                (Path(work) / "output.png")
+                .read_bytes()
+                .startswith(b"\x89PNG\r\n\x1a\n")
+            )
 
     def test_shell_escape_cannot_create_a_file(self):
         with tempfile.TemporaryDirectory() as work:
