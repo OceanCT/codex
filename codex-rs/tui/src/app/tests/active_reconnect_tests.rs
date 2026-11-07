@@ -633,7 +633,7 @@ async fn reconnect_reconciles_offscreen_pending_profile_before_restoring_permiss
 }
 
 #[tokio::test]
-async fn reconnect_exhaustion_and_unknown_initial_thread_stay_offline() -> Result<()> {
+async fn reconnect_startup_exhaustion_and_unknown_initial_thread_stay_offline() -> Result<()> {
     let (mut app, _, _) = make_test_app_with_channels().await;
     let listener = TcpListener::bind("127.0.0.1:0").await?;
     app.app_server_target = AppServerTarget::Remote {
@@ -652,7 +652,11 @@ async fn reconnect_exhaustion_and_unknown_initial_thread_stay_offline() -> Resul
                 id,
                 /*remote_cwd*/ None,
                 crate::dynamic_tools_mcp::ThreadToolTransport::Dynamic,
-                ReconnectPresentation::Conversation
+                if id.is_some() {
+                    ReconnectPresentation::Startup(start + Duration::from_secs(120))
+                } else {
+                    ReconnectPresentation::Conversation
+                }
             )
             .await
             .is_err()
@@ -663,7 +667,7 @@ async fn reconnect_exhaustion_and_unknown_initial_thread_stay_offline() -> Resul
     app.chat_widget.reconnect_failed();
     assert_snapshot!(
         "reconnect_failed",
-        render_bottom_popup(&app.chat_widget, /*width*/ 80)
+        render_bottom_popup(&app.chat_widget, /*width*/ 80).replace("◦", "•")
     );
     tokio::time::resume();
     Ok(())
@@ -705,7 +709,11 @@ async fn reconnect_allows_slow_hydration_but_bounds_a_stalled_server() -> Result
             Some(id),
             /*remote_cwd*/ None,
             crate::dynamic_tools_mcp::ThreadToolTransport::Dynamic,
-            ReconnectPresentation::Conversation,
+            if delay == 150 {
+                ReconnectPresentation::Startup(start + Duration::from_secs(120))
+            } else {
+                ReconnectPresentation::Conversation
+            },
         )
         .await;
         let elapsed = start.elapsed().as_secs();
@@ -799,4 +807,94 @@ pub(super) async fn drain_history(
             .flat_map(|cell| cell.transcript_lines(/*width*/ 80))
             .collect::<Vec<_>>(),
     ))
+}
+
+#[tokio::test]
+async fn reconnect_recovers_same_thread_after_outage_exceeds_retry_budget() -> Result<()> {
+    let (mut app, mut events, _) = make_test_app_with_channels().await;
+    app.config.model = Some("gpt-test".into());
+    let id = ThreadId::new();
+    app.active_thread_id = Some(id);
+    app.primary_thread_id = Some(id);
+    let cwd = app.config.cwd.clone();
+    app.chat_widget
+        .handle_thread_session(test_thread_session(id, cwd.to_path_buf()));
+    app.chat_widget
+        .restore_user_message_to_composer("draft during outage".into());
+    let listener = TcpListener::bind("127.0.0.1:0").await?;
+    let address = listener.local_addr()?;
+    drop(listener);
+    app.app_server_target = AppServerTarget::Remote {
+        endpoint: crate::resolve_remote_addr(&format!("ws://{address}"))?,
+    };
+    let mut session = crate::start_embedded_app_server_for_picker(&app.config).await?;
+    let mut tui = crate::tui::test_support::make_test_tui()?;
+    app.begin_reconnect();
+    let recovery = reconnect(
+        crate::backend_id::BackendId::new(),
+        app.app_server_target.clone(),
+        app.config.clone(),
+        app.local_settings.clone(),
+        Some(id),
+        /*remote_cwd*/ None,
+        crate::dynamic_tools_mcp::ThreadToolTransport::Dynamic,
+        ReconnectPresentation::Conversation,
+    );
+    tokio::pin!(recovery);
+    tokio::time::pause();
+    let exhausted = tokio::time::timeout(Duration::from_secs(130), &mut recovery).await;
+    tokio::time::resume();
+    assert!(
+        exhausted.is_err(),
+        "An outage must not permanently disable reconnection"
+    );
+    let listener = TcpListener::bind(address).await?;
+    let server = tokio::spawn(async move {
+        let thread = json!({"id": id, "sessionId": id, "preview": "", "ephemeral": false,
+            "modelProvider": "test-provider", "createdAt": 1, "updatedAt": 2,
+            "status": {"type": "idle"}, "cwd": cwd, "cliVersion": "0.0.0", "source": "cli", "turns": []});
+        loop {
+            let (stream, _) = listener.accept().await?;
+            // Virtual time can expire a handshake before the OS delivers its TCP
+            // connection. Like a real server, discard that stale connection.
+            let Ok(socket) = tokio_tungstenite::accept_async(stream).await else {
+                continue;
+            };
+            let methods = serve_reconnect_requests(socket, |request| {
+            std::future::ready(Some(match request.method.as_str() {
+                "thread/resume" => {
+                    assert_eq!(request.params.as_ref().unwrap()["threadId"], id.to_string());
+                    json!({"result": {"thread": thread, "model": "gpt-test", "modelProvider": "test-provider", "cwd": cwd,
+                        "approvalPolicy": "never", "approvalsReviewer": "user", "sandbox": {"type": "dangerFullAccess"}, "reasoningEffort": null}})
+                }
+                "thread/read" => json!({"result": {"thread": thread}}),
+                "thread/list" | "thread/loaded/list" => json!({"result": {"data": [], "nextCursor": null}}),
+                "thread/goal/get" => json!({"result": {"goal": null}}),
+                method => panic!("Recovery must not replay work: {method}"),
+            }))
+            }).await?;
+            if methods.iter().any(|method| method == "thread/resume") {
+                break Ok::<_, color_eyre::Report>(methods);
+            }
+        }
+    });
+    let connected = tokio::time::timeout(Duration::from_secs(30), &mut recovery).await??;
+    app.finish_reconnect(
+        &mut tui,
+        &mut session,
+        &mut events,
+        connected,
+        CODEX_CLI_VERSION,
+    )
+    .await?;
+    assert!(!app.reconnect.offline);
+    assert_eq!(app.current_displayed_thread_id(), Some(id));
+    assert_eq!(
+        app.chat_widget.composer_text_with_pending(),
+        "draft during outage"
+    );
+    session.shutdown().await?;
+    let methods = server.await??;
+    assert!(!methods.iter().any(|method| method == "turn/start"));
+    Ok(())
 }

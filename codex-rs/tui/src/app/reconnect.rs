@@ -56,7 +56,7 @@ pub(super) async fn reconnect(
     }
     // Connecting already has transport deadlines. Give healthy history/inventory hydration one
     // shared budget instead of repeatedly discarding its progress on a short per-attempt timer.
-    let deadline = match presentation {
+    let mut deadline = match presentation {
         ReconnectPresentation::Startup(deadline) => deadline,
         ReconnectPresentation::Conversation | ReconnectPresentation::Overview => {
             tokio::time::Instant::now() + Duration::from_secs(/*secs*/ 120)
@@ -125,7 +125,13 @@ pub(super) async fn reconnect(
         match result {
             Ok(Ok(connected)) => return Ok(connected),
             Ok(Err(_)) => {}
-            Err(_) => break,
+            Err(_) if matches!(presentation, ReconnectPresentation::Startup(_)) => break,
+            Err(_) => {
+                // Bound stalled hydration without giving up on an established session.
+                // Network outages and daemon restarts can outlast this budget. The loop
+                // keeps its backoff; dropping this future still cancels recovery.
+                deadline = tokio::time::Instant::now() + Duration::from_secs(120);
+            }
         }
         // Transport errors can contain endpoint credentials. Do not render or log them.
     }
