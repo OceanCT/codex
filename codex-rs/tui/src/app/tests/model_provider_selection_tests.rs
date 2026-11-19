@@ -25,7 +25,7 @@ fn write_picker_profile(home: &std::path::Path) -> Result<()> {
 #[tokio::test]
 async fn model_picker_profiles_switch_provider_and_restore_original_without_saving_defaults()
 -> Result<()> {
-    let (mut app, _events, _ops) = make_test_app_with_channels().await;
+    let (mut app, mut events, _ops) = make_test_app_with_channels().await;
     write_picker_profile(app.config.codex_home.as_path())?;
     let profiles = crate::model_picker_profiles::load(app.config.codex_home.as_path())?;
     assert!(!profiles[0].overrides.contains_key("approval_policy"));
@@ -54,7 +54,15 @@ async fn model_picker_profiles_switch_provider_and_restore_original_without_savi
             },
         ))
         .await?;
-        assert_eq!(app.chat_widget.current_model(), model);
+        let messages = std::iter::from_fn(|| events.try_recv().ok())
+            .filter_map(|event| match event {
+                AppEvent::InsertHistoryCell(cell) => {
+                    Some(lines_to_single_string(&cell.display_lines(120)))
+                }
+                _ => None,
+            })
+            .collect::<Vec<_>>();
+        assert_eq!(app.chat_widget.current_model(), model, "{messages:?}");
         let observed = server
             .resume_thread(
                 &app.local_settings,

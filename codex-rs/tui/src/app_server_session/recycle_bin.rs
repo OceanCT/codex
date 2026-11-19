@@ -13,7 +13,7 @@ impl AppServerSession {
                 "sourceKinds": ["cli", "vscode", "exec", "appServer", "subAgent", "unknown"],
             }))?;
             let page: ThreadListResponse = self
-                .client
+                .request_handle
                 .request_typed(ClientRequest::ThreadTrashList { request_id, params })
                 .await?;
             threads.extend(page.data);
@@ -27,7 +27,7 @@ impl AppServerSession {
     pub(crate) async fn restore_trashed_thread(&mut self, id: ThreadId) -> Result<Thread> {
         let request_id = self.next_request_id();
         let response: ThreadUnarchiveResponse = self
-            .client
+            .request_handle
             .request_typed(ClientRequest::ThreadTrashRestore {
                 request_id,
                 params: ThreadUnarchiveParams {

@@ -1,4 +1,4 @@
-//! Server RPCs own lifecycle outcomes; successful actions invalidate dashboard group caches.
+//! Server RPCs own lifecycle outcomes; cache cleanup follows the backend's removal scope.
 //! Keep the dashboard browsable during RPCs while deferring task notifications.
 //! Removing the current root leaves an unattached dashboard, even when it is empty.
 
@@ -84,7 +84,7 @@ async fn run_lifecycle_modal<T>(
                     }
                     tui::TuiEvent::Key(_) | tui::TuiEvent::Paste(_) | tui::TuiEvent::FocusLost | tui::TuiEvent::Mouse(_) => {}
                     tui::TuiEvent::Draw | tui::TuiEvent::Resize(_) | tui::TuiEvent::Resume | tui::TuiEvent::FocusGained => {
-                        app.expire_pending_key_chord();
+                        app.expire_pending_key_chord(tui);
                         app.render_chat_widget_frame(tui, screen_size)?;
                     }
                 }
@@ -106,7 +106,7 @@ impl App {
             return;
         }
         let request_id = Uuid::new_v4();
-        self.agents_overview.pending_pin_change = Some(request_id);
+        self.agents_overview.pending_pin_change = Some((request_id, app_server.backend_id()));
         let request_handle = app_server.request_handle();
         let app_event_tx = self.app_event_tx.clone();
         tokio::spawn(async move {
@@ -139,13 +139,19 @@ impl App {
         pinned: bool,
         result: Result<(), String>,
     ) {
-        if self.agents_overview.pending_pin_change != Some(request_id) {
+        let Some((_, owner)) = self
+            .agents_overview
+            .pending_pin_change
+            .filter(|(id, _)| *id == request_id)
+        else {
             return;
-        }
+        };
         self.agents_overview.pending_pin_change = None;
         match result {
             Ok(()) => {
-                if let Some(pinned_thread_ids) = self.agents_overview.pinned_thread_ids.as_mut() {
+                if let Some(Some(pinned_thread_ids)) =
+                    self.agents_overview.pins_by_backend.get_mut(&owner)
+                {
                     if pinned {
                         if !pinned_thread_ids.contains(&thread_id) {
                             pinned_thread_ids.push(thread_id);
@@ -166,7 +172,7 @@ impl App {
         if let Some(refresh) = self.agents_overview.refresh_task.take() {
             refresh.abort();
         }
-        self.agents_overview.request_id = None;
+        self.agents_overview.active_refresh = None;
         self.agents_overview.refresh_show_more = false;
         self.agents_overview.refresh_notifications.clear();
         let refresh_thread_ids =
@@ -185,15 +191,101 @@ impl App {
         thread_id: ThreadId,
         action: AgentsOverviewAction,
     ) {
-        if self
+        let Some(thread) = self
             .agents_overview
             .threads
             .get(&thread_id)
-            .is_some_and(Option::is_some)
-        {
+            .and_then(Option::as_ref)
+            .or_else(|| self.agents_overview.search_matches.get(&thread_id))
+        else {
+            return;
+        };
+        if self.app_server_target != crate::AppServerTarget::Cloud {
             self.app_event_tx
                 .send(AppEvent::RunAgentsOverviewAction { thread_id, action });
+            return;
         }
+        let name = thread.name.as_deref().unwrap_or(&thread.preview);
+        let name = name
+            .trim()
+            .lines()
+            .next()
+            .filter(|name| !name.is_empty())
+            .unwrap_or("Untitled task");
+        let (title, description, label) = match action {
+            AgentsOverviewAction::Archive
+                if self.app_server_target == crate::AppServerTarget::Cloud =>
+            {
+                (
+                    format!("Archive “{name}”?"),
+                    "This stops any running work in this task and archives it. Child agents stay unchanged. Its history can be restored from the resume picker.",
+                    "Archive task",
+                )
+            }
+            AgentsOverviewAction::Archive => (
+                format!("Archive “{name}”?"),
+                "This stops any running work in this task and its child agents, then archives them. Their history can be restored from the resume picker.",
+                "Archive task and child agents",
+            ),
+            AgentsOverviewAction::Delete => (
+                format!("Permanently delete “{name}”?"),
+                "Tasks with saved side chats stay intact. Otherwise, deleting this task stops its running work and permanently deletes its history and its child agents’ history.",
+                "Permanently delete task and child agents",
+            ),
+        };
+        self.chat_widget.show_selection_view(SelectionViewParams {
+            header: Box::new(LifecycleHeader(vec![
+                title.bold().into(),
+                description.dim().into(),
+            ])),
+            items: vec![
+                SelectionItem {
+                    name: "Cancel".to_string(),
+                    dismiss_on_select: true,
+                    ..Default::default()
+                },
+                SelectionItem {
+                    name: label.to_string(),
+                    actions: vec![Box::new(move |tx| {
+                        tx.send(AppEvent::RunAgentsOverviewAction { thread_id, action })
+                    })],
+                    dismiss_on_select: true,
+                    require_explicit_confirmation: action == AgentsOverviewAction::Delete,
+                    ..Default::default()
+                },
+            ],
+            ..SelectionViewParams::confirmation()
+        });
+    }
+
+    pub(super) fn known_thread_subtree(&self, thread_id: ThreadId) -> HashSet<ThreadId> {
+        let mut removed = HashSet::from([thread_id]);
+        loop {
+            let previous_len = removed.len();
+            for (id, thread) in &self.agents_overview.threads {
+                let Some(thread) = thread else { continue };
+                let parent = thread
+                    .parent_thread_id
+                    .as_deref()
+                    .and_then(|id| ThreadId::from_string(id).ok())
+                    .or(match &thread.source {
+                        SessionSource::SubAgent(SubAgentSource::ThreadSpawn {
+                            parent_thread_id,
+                            ..
+                        }) => Some(*parent_thread_id),
+                        _ => None,
+                    });
+                if thread.session_id == thread_id.to_string()
+                    || parent.is_some_and(|parent| removed.contains(&parent))
+                {
+                    removed.insert(*id);
+                }
+            }
+            if removed.len() == previous_len {
+                break;
+            }
+        }
+        removed
     }
 
     pub(super) async fn run_agents_overview_action(
@@ -206,6 +298,10 @@ impl App {
         if self.windows_sandbox_blocks_thread_switch() {
             return Ok(());
         }
+        // Cloud archives only the selected thread; Local lifecycle actions include descendants.
+        let removes_subtree = action != AgentsOverviewAction::Archive
+            || app_server.thread_params_mode()
+                != crate::app_server_session::ThreadParamsMode::Cloud;
         // The overview may lack intermediate ancestors, or even the primary's metadata.
         let mut removes_primary = self.primary_thread_id == Some(thread_id);
         let mut attempted = false;
@@ -224,13 +320,17 @@ impl App {
             state.rename_target = None;
         }
         self.repaint_agents_overview();
-        let voice_result = self
-            .stop_voice_for_removed_thread(app_server, thread_id)
-            .await;
+        let voice_result = if removes_subtree || self.voice_owner_thread_id() == Some(thread_id) {
+            self.stop_voice_for_removed_thread(app_server, thread_id)
+                .await
+        } else {
+            Ok(())
+        };
         let operation = async {
             let result = async {
                 voice_result?;
-                if let Some(primary) = primary_thread_id
+                if removes_subtree
+                    && let Some(primary) = primary_thread_id
                     && primary != thread_id
                 {
                     removes_primary = app_server
@@ -242,6 +342,12 @@ impl App {
                 attempted = true;
                 match action {
                     AgentsOverviewAction::Archive => app_server.thread_archive(thread_id).await,
+                    AgentsOverviewAction::Delete
+                        if app_server.thread_params_mode()
+                            == crate::app_server_session::ThreadParamsMode::Cloud =>
+                    {
+                        app_server.thread_delete(thread_id).await
+                    }
                     AgentsOverviewAction::Delete => app_server.thread_trash(thread_id).await,
                 }
             }
@@ -285,7 +391,7 @@ impl App {
             if let Some(refresh) = self.agents_overview.refresh_task.take() {
                 refresh.abort();
             }
-            self.agents_overview.request_id = None;
+            self.agents_overview.active_refresh = None;
             self.agents_overview.refresh_show_more = false;
             self.agents_overview.active_refresh_thread_ids.clear();
             self.agents_overview
@@ -297,33 +403,11 @@ impl App {
             self.agents_overview.refresh_notifications.clear();
         }
         if result.is_ok() {
-            // Invalidate cached details for the displayed group, without inferring child outcomes.
-            let mut removed = HashSet::from([thread_id]);
-            loop {
-                let previous_len = removed.len();
-                for (id, thread) in &self.agents_overview.threads {
-                    let Some(thread) = thread else { continue };
-                    let parent = thread
-                        .parent_thread_id
-                        .as_deref()
-                        .and_then(|id| ThreadId::from_string(id).ok())
-                        .or(match &thread.source {
-                            SessionSource::SubAgent(SubAgentSource::ThreadSpawn {
-                                parent_thread_id,
-                                ..
-                            }) => Some(*parent_thread_id),
-                            _ => None,
-                        });
-                    if thread.session_id == thread_id.to_string()
-                        || parent.is_some_and(|parent| removed.contains(&parent))
-                    {
-                        removed.insert(*id);
-                    }
-                }
-                if removed.len() == previous_len {
-                    break;
-                }
-            }
+            let mut removed = if removes_subtree {
+                self.known_thread_subtree(thread_id)
+            } else {
+                HashSet::from([thread_id])
+            };
             if let Some(primary) = self.primary_thread_id
                 && removes_primary
             {

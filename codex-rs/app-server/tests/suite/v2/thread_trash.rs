@@ -19,7 +19,7 @@ async fn trash_survives_restart_and_restores_without_affecting_ordinary_archives
     let home = TempDir::new()?;
     MockResponsesConfig::new(&mock.uri()).write(home.path())?;
     let mut ids = Vec::new();
-    for name in ["trash", "archive", "child"] {
+    for name in ["trash", "archive", "child", "previously archived child"] {
         ids.push(create_fake_rollout(
             home.path(),
             "2025-01-01T00-00-00",
@@ -46,6 +46,21 @@ async fn trash_survives_restart_and_restores_without_affecting_ordinary_archives
             codex_protocol::ThreadId::from_string(&ids[2])?,
             codex_state::DirectionalThreadSpawnEdgeStatus::Open,
         )
+        .await?;
+    state
+        .upsert_thread_spawn_edge(
+            codex_protocol::ThreadId::from_string(&ids[0])?,
+            codex_protocol::ThreadId::from_string(&ids[3])?,
+            codex_state::DirectionalThreadSpawnEdgeStatus::Open,
+        )
+        .await?;
+    let _: ThreadArchiveResponse = server
+        .request(|request_id| ClientRequest::ThreadArchive {
+            request_id,
+            params: ThreadArchiveParams {
+                thread_id: ids[3].clone(),
+            },
+        })
         .await?;
     let _: ThreadArchiveResponse = server
         .request(|request_id| ClientRequest::ThreadTrash {
@@ -85,7 +100,7 @@ async fn trash_survives_restart_and_restores_without_affecting_ordinary_archives
         .request(|request_id| ClientRequest::ThreadTrashRestore {
             request_id,
             params: ThreadUnarchiveParams {
-                thread_id: ids[0].clone(),
+                thread_id: page.data[0].id.clone(),
             },
         })
         .await?;
@@ -97,12 +112,14 @@ async fn trash_survives_restart_and_restores_without_affecting_ordinary_archives
                 .unwrap(),
         })
         .await?;
+    let archived_ids = page
+        .data
+        .iter()
+        .map(|thread| thread.id.clone())
+        .collect::<std::collections::BTreeSet<_>>();
     assert_eq!(
-        page.data
-            .iter()
-            .map(|thread| thread.id.clone())
-            .collect::<Vec<_>>(),
-        vec![ids[1].clone()]
+        archived_ids,
+        [ids[1].clone(), ids[3].clone()].into_iter().collect()
     );
     server.shutdown_gracefully().await?;
     Ok(())

@@ -132,26 +132,24 @@ impl ThreadRequestProcessor {
         }
         // Cancel expiry durably before restoring. Partial failures remain ordinary archives.
         std::fs::remove_file(path).map_err(trash_error)?;
-        for thread_id in entry
+        let descendants = entry
             .restore_ids
             .into_iter()
             .filter(|id| *id != params.thread_id)
-        {
-            let (_, thread_id) = self
-                .thread_unarchive_response(ThreadUnarchiveParams { thread_id })
-                .await?;
+            .map(|id| {
+                ThreadId::from_string(&id).map_err(|error| invalid_request(error.to_string()))
+            })
+            .collect::<Result<Vec<_>, _>>()?;
+        let (response, restored_ids) = self.thread_unarchive_selected(params, descendants).await?;
+        for thread_id in restored_ids {
             self.outgoing
                 .send_server_notification(ServerNotification::ThreadUnarchived(
-                    ThreadUnarchivedNotification { thread_id },
+                    ThreadUnarchivedNotification {
+                        thread_id: thread_id.to_string(),
+                    },
                 ))
                 .await;
         }
-        let (response, thread_id) = self.thread_unarchive_response(params).await?;
-        self.outgoing
-            .send_server_notification(ServerNotification::ThreadUnarchived(
-                ThreadUnarchivedNotification { thread_id },
-            ))
-            .await;
         Ok(Some(response.into()))
     }
 

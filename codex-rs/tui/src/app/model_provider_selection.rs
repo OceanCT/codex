@@ -48,8 +48,9 @@ impl App {
         };
         let profiles = crate::model_picker_profiles::load(self.config.codex_home.as_path())?;
         let profile = profiles
-            .into_iter()
-            .find(|profile| profile.preset.model == model);
+            .iter()
+            .find(|profile| profile.preset.model == model)
+            .cloned();
         let mut config = self.config.clone();
         config.model = Some(model.clone());
         config.model_reasoning_effort = effort.clone();
@@ -67,6 +68,26 @@ impl App {
                 std::collections::HashMap::new(),
             ),
         };
+        // Admission validates both routes. Keep the current local provider definition
+        // available when returning to a built-in provider or selecting another profile.
+        if let Some(current) = profiles
+            .iter()
+            .find(|profile| profile.preset.model == self.chat_widget.current_model())
+            && let Some(serde_json::Value::Object(definitions)) =
+                current.overrides.get("model_providers")
+        {
+            let target = overrides
+                .entry("model_providers".to_string())
+                .or_insert_with(|| serde_json::json!({}));
+            if let serde_json::Value::Object(target) = target {
+                for (name, definition) in definitions {
+                    target
+                        .entry(name.clone())
+                        .or_insert_with(|| definition.clone());
+                }
+            }
+        }
+        overrides.insert("codex_y_model_provider_switch".to_string(), true.into());
         if let Some(service_tier) = service_tier {
             config.service_tier = Some(service_tier.clone());
             overrides.insert("service_tier".to_string(), service_tier.into());

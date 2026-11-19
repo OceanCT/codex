@@ -27,17 +27,17 @@ async fn index_empty_thread(home: &std::path::Path, started: &ThreadStartRespons
         started.model_provider.clone(),
     )
     .await?;
-    let mut builder = codex_state::ThreadMetadataBuilder::new(
+    let builder = codex_state::ThreadMetadataBuilder::new(
         codex_protocol::ThreadId::from_string(&started.thread.id)?,
         started.thread.path.clone().expect("rollout path"),
         chrono::Utc::now(),
         codex_protocol::protocol::SessionSource::VSCode,
-    );
-    builder.cwd = started.cwd.as_path().to_path_buf();
-    builder.history_mode = match started.thread.history_mode {
+    )
+    .with_cwd(started.cwd.as_path().to_path_buf())
+    .with_history_mode(match started.thread.history_mode {
         ThreadHistoryMode::Legacy => codex_protocol::protocol::ThreadHistoryMode::Legacy,
         ThreadHistoryMode::Paginated => codex_protocol::protocol::ThreadHistoryMode::Paginated,
-    };
+    });
     state
         .upsert_thread(&builder.build(&started.model_provider))
         .await?;
