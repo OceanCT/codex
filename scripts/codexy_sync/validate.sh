@@ -10,8 +10,10 @@ python3 "$runtime_builder"
 # Separate filters fail on an empty selection rather than silently skipping a feature.
 just test --locked -p codex-app-server-protocol schema_fixtures_tests
 just test --locked -p codex-app-server thread_trash
+just test --locked -p codex-app-server thread_unarchive
 just test --locked -p codex-app-server thread_empty_lifecycle
 just test --locked -p codex-app-server thread_resume_empty
+just test --locked -p codex-app-server thread_resume_returns_provider_error_even_with_provider_override
 just test --locked -p codex-tui agents_overview
 just test --locked -p codex-tui model_picker_profiles
 just test --locked -p codex-tui provider_selection
