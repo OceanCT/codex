@@ -69,6 +69,17 @@
         "codex-rs/tui/src/app/model_provider_selection.rs",
         "codex-rs/tui/src/app/tests/model_provider_selection_tests.rs"
       ]
+    },
+    "断联后持续恢复": {
+      "paths": [
+        "codex-rs/tui/src/app/reconnect.rs",
+        "codex-rs/tui/src/app/tests/active_reconnect_tests.rs",
+        "codex-rs/tui/src/app/tests/disconnect.rs"
+      ],
+      "required_files": [
+        "codex-rs/tui/src/app/reconnect.rs",
+        "codex-rs/tui/src/app/tests/active_reconnect_tests.rs"
+      ]
     }
   },
   "execution": "local-only"

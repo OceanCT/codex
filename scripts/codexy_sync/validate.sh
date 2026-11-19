@@ -16,6 +16,8 @@ just test --locked -p codex-tui agents_overview
 just test --locked -p codex-tui model_picker_profiles
 just test --locked -p codex-tui provider_selection
 just test --locked -p codex-tui rollout_history
+just test --locked -p codex-tui reconnect
+just test --locked -p codex-tui markdown_render::math
 just test --locked -p codex-tui image_generation
 just test --locked -p codex-tui rich_media
 just test --locked -p codex-tui agents_opens_unloaded_history_on_the_cli_stack
